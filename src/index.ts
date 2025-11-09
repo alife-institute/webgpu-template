@@ -1,8 +1,4 @@
-import {
-  requestDevice,
-  configureCanvas,
-  createShaderModule,
-} from "./utils";
+import { requestDevice, configureCanvas, createShaderModule } from "./utils";
 
 // Import shaders
 import computeShader from "./shaders/compute.wgsl";
@@ -40,10 +36,10 @@ async function main() {
   for (let i = 0; i < initialData.length; i += 4) {
     // Random initial state (black or white)
     const value = Math.random() > 0.5 ? 255 : 0;
-    initialData[i] = value;     // R
+    initialData[i] = value; // R
     initialData[i + 1] = value; // G
     initialData[i + 2] = value; // B
-    initialData[i + 3] = 255;   // A
+    initialData[i + 3] = 255; // A
   }
 
   device.queue.writeTexture(

@@ -100,10 +100,6 @@ Options:
   --wait <ms>          Wait time before first screenshot (default: 1000)
   --help, -h           Show this help message
 
-Example:
-  node tools/capture-simulation.js --screenshots 20 --interval 250
-  node tools/capture-simulation.js --url http://localhost:5500 --headless true
-
 Note:
   - Captures are saved to .capture/ (hidden folder) by default to avoid git commits.
   - Default opens dist/index.html directly (no server needed) with visible browser
