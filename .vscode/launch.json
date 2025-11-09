@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "chrome",
+            "name": "Debug with Chrome",
+            "request": "launch",
+            "url": "http://localhost:5500/dist",
+            "runtimeArgs": [
+                "--enable-unsafe-webgpu",
+                "--enable-features=Vulkan",
+            ],
+        }
+    ]
+}
