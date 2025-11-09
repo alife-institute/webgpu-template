@@ -8,21 +8,9 @@ This project uses Webpack to build TypeScript and WGSL shaders into a static HTM
 
 ```bash
 npm run build    # Build to dist/
-npm start        # Dev server with hot-reload on localhost:5500
 ```
 
 **Important**: The final output is a **static HTML file** at `dist/index.html`, along with bundled JavaScript.
-
-### Development Server
-
-The webpack-dev-server runs on `http://localhost:5500` and serves the `dist` directory at the root path:
-
-- **App URL** (`http://localhost:5500`): Serves the application from `dist/index.html`
-- **Alternative** (`http://localhost:5500/index.html`): Also serves the application
-
-The dev server serves the content **FROM** the `dist/` directory **AT** the root URL path. This provides hot-reloading: whenever source files change, webpack rebuilds to `dist/` and the browser automatically refreshes.
-
-**When testing or capturing**: Use `http://localhost:5500`.
 
 ### File Structure
 
@@ -51,13 +39,12 @@ After making code changes, use the capture tool to verify the simulation works:
 # 1. Build the project
 npm run build
 
-# 2. Capture screenshots and console output (opens visible browser)
-npm run capture:quick     # Fast: 5 screenshots
-npm run capture           # Standard: 10 screenshots
-npm run capture:detailed  # Thorough: 30 screenshots
+# 2. Capture screenshots and console output
+npm run capture
 ```
 
 **What gets captured**:
+
 - Console output (logs, warnings, errors)
 - Multiple screenshots showing animation over time
 - JSON summary with error analysis
@@ -67,12 +54,14 @@ npm run capture:detailed  # Thorough: 30 screenshots
 ### When to Use Capture Tool
 
 **Always capture after**:
+
 - Modifying shaders (compute.wgsl, render.wgsl)
 - Changing simulation logic (index.ts)
 - Updating WebGPU initialization (utils.ts)
 - Making any code changes that affect rendering
 
 **Why**: The capture tool runs in a real Chrome browser with WebGPU support, catching:
+
 - Shader compilation errors
 - WebGPU API usage errors
 - Runtime errors that don't show up during build
@@ -81,6 +70,7 @@ npm run capture:detailed  # Thorough: 30 screenshots
 ### Expected Console Output
 
 A healthy simulation should show:
+
 ```
 ✓ [INFO] [webpack-dev-server] Server started...
 ✓ [LOG] [HMR] Waiting for update signal from WDS...
@@ -88,17 +78,19 @@ A healthy simulation should show:
 ```
 
 **Common errors to watch for**:
-- `Failed to load resource: 404` - Wrong URL or missing file (usually just favicon)
+
+- `Failed to load resource: 404` - Wrong URL or missing file
 - `Shader compilation failed` - WGSL syntax errors
 - `WebGPU not supported` - Browser compatibility issue
 - `TypeError` - JavaScript errors in your code
 
-### WebGPU Screenshot Capture
+### WebGPU Screenshot and Console Capture
 
 **The capture tool opens a visible browser by default** so WebGPU screenshots work correctly:
+
 - Opens `dist/index.html` directly using `file://` protocol
 - No dev server needed
-- Screenshots capture the actual Game of Life animation
+- Screenshots capture the actual rendered output
 - Console logs are also captured for debugging
 
 **Note**: WebGPU does not render in headless Chrome, so screenshots would be black in headless mode. The default non-headless mode ensures screenshots work out of the box.
@@ -116,80 +108,10 @@ jq '.errors' .capture/session-*/summary.json
 open .capture/session-*/frame-0002.png
 ```
 
-## WebGPU-Specific Guidelines
+### Development Server
 
-### Shader Type Consistency
-
-WGSL is strongly typed and doesn't allow mixing signed/unsigned integers:
-
-```wgsl
-// ❌ WRONG: Mixing i32 and u32
-let size = textureDimensions(inputTexture);  // returns vec2<u32>
-let pos = vec2i(x, y);                       // vec2<i32>
-let result = pos.x + size.x;                 // ERROR: i32 + u32
-
-// ✅ CORRECT: Cast to consistent type
-let size = vec2i(textureDimensions(inputTexture));  // Cast to vec2<i32>
-let pos = vec2i(x, y);
-let result = pos.x + size.x;                        // OK: i32 + i32
-```
-
-### Hard-Coded Vertex Shader
-
-This template uses a hard-coded full-screen quad in the vertex shader (no vertex buffers needed):
-
-```wgsl
-@vertex
-fn vertex_main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
-    // Generates 6 vertices for 2 triangles covering the screen
-    let vertices = array<vec2f, 6>(
-        vec2f(-1.0, -1.0),  // Bottom-left
-        vec2f( 1.0, -1.0),  // Bottom-right
-        vec2f(-1.0,  1.0),  // Top-left
-        // ... triangle 2
-    );
-    // ...
-}
-```
-
-**Workshop participants should focus on**:
-- Compute shaders (simulation logic)
-- Fragment shaders (visualization/colors)
-
-**They should NOT need to modify**:
-- Vertex shader (it's intentionally hard-coded)
-- Buffer management (handled in index.ts)
-
-## Workshop Considerations
-
-This template is designed for first-time WebGPU users in a workshop setting:
-
-1. **Keep it simple**: The template is already simplified - don't add complexity
-2. **Clear comments**: All code is heavily commented - maintain this
-3. **Ping-pong pattern**: Two textures alternate for simulation state
-4. **Example included**: Conway's Game of Life demonstrates the pattern
-5. **Easy modifications**: Simulation size, colors, and rules are easy to change
-
-### Common Workshop Tasks
-
-Participants will typically:
-- Modify the compute shader to implement different simulations
-- Change colors in the fragment shader for visualization
-- Adjust simulation parameters (size, speed)
-- Experiment with different cellular automata rules
-
-### Testing Workshop Changes
-
-When helping workshop participants:
+This is typically used by human for debugging sessions and visualising hot-reloaded code changes
 
 ```bash
-# 1. Make changes to shaders or code
-# 2. Webpack automatically rebuilds (if npm start is running)
-# 3. Capture to verify it works
-npm run capture:quick
-
-# 4. Check for errors
-cat .capture/session-*/console.log | grep ERROR
+npm start # hot-reload on localhost:5500
 ```
-
-If errors occur, the console.log will show WGSL compilation errors with line numbers.
