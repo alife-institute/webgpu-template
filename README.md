@@ -30,6 +30,8 @@ npm start
 
 3. **Open your browser** and navigate to `http://localhost:5500`
 
+   (The dev server serves the built files from `dist/` at the root URL)
+
 ## Project Structure
 
 ```
@@ -168,6 +170,42 @@ If the simulation is slow:
 1. Reduce `SIMULATION_SIZE` in `index.ts`
 2. Simplify your compute shader logic
 3. Check browser developer tools for errors
+
+## Automated Testing & Capture
+
+The template includes a browser automation tool for capturing console output and animation frames:
+
+```bash
+# Build first
+npm run build
+
+# Quick capture: 5 screenshots at 1s intervals (visible browser, captures WebGPU!)
+npm run capture:quick
+
+# Standard capture: 10 screenshots at 500ms intervals (visible browser)
+npm run capture
+
+# Detailed capture: 30 screenshots at 200ms intervals (visible browser)
+npm run capture:detailed
+```
+
+**Note**: The capture tool opens a visible browser by default so WebGPU screenshots work. It opens `dist/index.html` directly - no dev server needed!
+
+### What it captures:
+
+- **Console Output**: All logs, warnings, and errors
+- **Screenshots**: Animation frames over time
+- **Summary Report**: Statistics and error analysis
+
+### Output location:
+
+All captures are saved to `./.capture/session-[timestamp]/` (hidden folder, automatically ignored by git):
+- `frame-NNNN.png` - Screenshot frames
+- `console.log` - Human-readable console output
+- `console.json` - Structured console data
+- `summary.json` - Capture statistics
+
+For more details, see [`tools/README.md`](tools/README.md).
 
 ## Learn More
 

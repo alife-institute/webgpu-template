@@ -7,7 +7,10 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "webpack serve --port 5500",
     "watch": "webpack --watch",
-    "build": "webpack"
+    "build": "webpack",
+    "capture": "node tools/capture-simulation.js",
+    "capture:quick": "node tools/capture-simulation.js --screenshots 5 --interval 1000",
+    "capture:detailed": "node tools/capture-simulation.js --screenshots 30 --interval 200"
   },
   "license": "MIT",
   "dependencies": {
@@ -18,5 +21,8 @@
     "webpack": "^5.94.0",
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^5.1.0"
+  },
+  "devDependencies": {
+    "puppeteer": "^24.29.1"
   }
 }
