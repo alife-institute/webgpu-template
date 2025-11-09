@@ -4,7 +4,7 @@
             "type": "chrome",
             "name": "Debug with Chrome",
             "request": "launch",
-            "url": "http://localhost:5500/dist",
+            "url": "http://localhost:5500",
             "runtimeArgs": [
                 "--enable-unsafe-webgpu",
                 "--enable-features=Vulkan",
