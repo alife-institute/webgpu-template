@@ -48,18 +48,21 @@ src/
 ### 1. Simulation Flow
 
 ```
-Initialize State → Compute Shader → Ping-Pong → Render Shader → Display
-                        ↓              ↓
-                   Update Logic   Swap Buffers
+Initialize State → Compute Shader (in-place update) → Render Shader → Display
+                        ↓
+                   Update Logic (read & write same texture)
 ```
 
-### 2. Ping-Pong Buffers
+### 2. In-Place State Updates
 
-The template uses two textures that alternate roles:
-- **Frame N**: Read from Texture A, write to Texture B
-- **Frame N+1**: Read from Texture B, write to Texture A
+This template uses a single read-write storage texture for simplicity:
+- **stateTexture**: Single texture with `read_write` access
+- Compute shader reads neighbors, then writes new state to same texture
+- **Note**: For cellular automata, this creates race conditions (cells may read mixed old/new states)
+- Result: Interesting visual artifacts but not "correct" Game of Life
 
-This prevents reading and writing to the same texture simultaneously.
+For deterministic cellular automata, use double-buffering (see git history).
+This pattern works well for simulations without strict neighbor dependencies.
 
 ### 3. Shader Pipeline
 

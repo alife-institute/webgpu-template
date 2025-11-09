@@ -6,7 +6,7 @@
  */
 
 @group(0) @binding(0) var texSampler: sampler;
-@group(0) @binding(1) var simulationTexture: texture_2d<f32>;
+@group(0) @binding(1) var simulationTexture: texture_2d<u32>;
 
 // Vertex shader output / Fragment shader input
 struct VertexOutput {
@@ -50,15 +50,22 @@ fn vertex_main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
  */
 @fragment
 fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
-    // Sample the simulation state
-    let state = textureSample(simulationTexture, texSampler, input.texCoord);
+    // Get texture dimensions and convert normalized coords to pixel coords
+    let texSize = vec2f(textureDimensions(simulationTexture));
+    let pixelCoord = vec2i(input.texCoord * texSize);
+
+    // Load the simulation state (uint texture requires textureLoad, not textureSample)
+    let stateValue = textureLoad(simulationTexture, pixelCoord, 0);
+
+    // Convert uint to float for color interpolation
+    let stateFactor = f32(stateValue.r);
 
     // Color mapping - modify this for different visualizations!
     // Current: white for alive cells, dark blue for dead cells
     let aliveColor = vec3f(1.0, 1.0, 1.0);    // White
     let deadColor = vec3f(0.05, 0.05, 0.15);  // Dark blue
 
-    let color = mix(deadColor, aliveColor, state.r);
+    let color = mix(deadColor, aliveColor, stateFactor);
 
     return vec4f(color, 1.0);
 }

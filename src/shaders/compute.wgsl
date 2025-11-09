@@ -1,21 +1,20 @@
 /**
- * Compute Shader - Conway's Game of Life
+ * Compute Shader - Conway's Game of Life (In-Place Update)
  *
- * This is a simple example of a 2D cellular automaton simulation.
- * Modify this shader to create your own simulations!
+ * NOTE: This uses a single read-write texture for simplicity.
+ * For cellular automata with neighbor dependencies, this creates race conditions
+ * because cells may read a mix of old and new states. This produces interesting
+ * visual artifacts but is not the "correct" Game of Life algorithm.
  *
- * Rules of Game of Life:
- * 1. Any live cell with 2-3 neighbors survives
- * 2. Any dead cell with exactly 3 neighbors becomes alive
- * 3. All other cells die or stay dead
+ * For deterministic cellular automata, use double-buffering (see git history).
+ * This pattern works well for simulations without neighbor dependencies.
  */
 
-@group(0) @binding(0) var inputTexture: texture_2d<f32>;
-@group(0) @binding(1) var outputTexture: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(0) var stateTexture: texture_storage_2d<r32uint, read_write>;
 
 // Count the number of alive neighbors around a cell
 fn countNeighbors(pos: vec2i) -> u32 {
-    let size = vec2i(textureDimensions(inputTexture));
+    let size = vec2i(textureDimensions(stateTexture));
     var count = 0u;
 
     // Check all 8 neighbors
@@ -31,8 +30,8 @@ fn countNeighbors(pos: vec2i) -> u32 {
                 (pos.y + dy + size.y) % size.y
             );
 
-            let cell = textureLoad(inputTexture, neighbor, 0);
-            if (cell.r > 0.5) {
+            let cell = textureLoad(stateTexture, neighbor);
+            if (cell.r > 0u) {
                 count += 1u;
             }
         }
@@ -44,7 +43,7 @@ fn countNeighbors(pos: vec2i) -> u32 {
 @compute @workgroup_size(16, 16)
 fn compute_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let pos = vec2i(global_id.xy);
-    let size = vec2i(textureDimensions(inputTexture));
+    let size = vec2i(textureDimensions(stateTexture));
 
     // Boundary check
     if (pos.x >= size.x || pos.y >= size.y) {
@@ -52,27 +51,26 @@ fn compute_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     }
 
     // Get current cell state
-    let currentCell = textureLoad(inputTexture, pos, 0);
-    let isAlive = currentCell.r > 0.5;
+    let currentCell = textureLoad(stateTexture, pos);
+    let isAlive = currentCell.r > 0u;
 
     // Count neighbors
     let neighbors = countNeighbors(pos);
 
     // Apply Game of Life rules
-    var newState = 0.0;
+    var newState = 0u;
     if (isAlive) {
         // Survival: 2 or 3 neighbors
         if (neighbors == 2u || neighbors == 3u) {
-            newState = 1.0;
+            newState = 1u;
         }
     } else {
         // Birth: exactly 3 neighbors
         if (neighbors == 3u) {
-            newState = 1.0;
+            newState = 1u;
         }
     }
 
-    // Write result with some color variation based on neighbors
-    let color = vec4f(newState, newState * 0.8, newState * 0.6, 1.0);
-    textureStore(outputTexture, pos, color);
+    // Write result back to same texture
+    textureStore(stateTexture, pos, vec4u(newState, 0u, 0u, 0u));
 }
