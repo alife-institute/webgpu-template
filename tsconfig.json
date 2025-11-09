@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+        "outDir": "./dist/",
+        "noImplicitAny": false,
+        "target": "es2022",
+        "module": "es2022",
+        "jsx": "react",
+        "allowJs": true,
+        "moduleResolution": "node",
+        "sourceMap": true,
+        "strict": true,
+        "types": [
+            "@webgpu/types",
+        ],
+    }
+}
