@@ -6,7 +6,7 @@
  */
 
 @group(0) @binding(0) var texSampler: sampler;
-@group(0) @binding(1) var simulationTexture: texture_2d<u32>;
+@group(0) @binding(1) var simulationTexture: texture_2d_array<u32>;
 
 // Vertex shader output / Fragment shader input
 struct VertexOutput {
@@ -46,7 +46,10 @@ fn vertex_main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
 
 /**
  * Fragment Shader - Renders the simulation with custom colors
- * Modify the color mapping to change the visualization!
+ * Visualizes two layers with different colors:
+ * - Layer 0: Cyan/Blue
+ * - Layer 1: Magenta/Red
+ * - Both layers: White (overlap)
  */
 @fragment
 fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
@@ -54,18 +57,31 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
     let texSize = vec2f(textureDimensions(simulationTexture));
     let pixelCoord = vec2i(input.texCoord * texSize);
 
-    // Load the simulation state (uint texture requires textureLoad, not textureSample)
-    let stateValue = textureLoad(simulationTexture, pixelCoord, 0);
+    // Load the simulation state from both layers
+    // textureLoad for texture_2d_array requires: (texture, coords, array_index, mip_level)
+    let layer0State = textureLoad(simulationTexture, pixelCoord, 0, 0);
+    let layer1State = textureLoad(simulationTexture, pixelCoord, 1, 0);
 
     // Convert uint to float for color interpolation
-    let stateFactor = f32(stateValue.r);
+    let layer0Alive = f32(layer0State.r);
+    let layer1Alive = f32(layer1State.r);
 
-    // Color mapping - modify this for different visualizations!
-    // Current: white for alive cells, dark blue for dead cells
-    let aliveColor = vec3f(1.0, 1.0, 1.0);    // White
-    let deadColor = vec3f(0.05, 0.05, 0.15);  // Dark blue
+    // Color mapping for two layers:
+    // Layer 0: Cyan (0, 1, 1) when alive
+    // Layer 1: Magenta (1, 0, 1) when alive
+    // Both: White (additive mixing)
+    let layer0Color = vec3f(0.0, 1.0, 1.0) * layer0Alive;  // Cyan
+    let layer1Color = vec3f(1.0, 0.0, 1.0) * layer1Alive;  // Magenta
 
-    let color = mix(deadColor, aliveColor, stateFactor);
+    // Combine layers additively
+    let combinedColor = layer0Color + layer1Color;
 
-    return vec4f(color, 1.0);
+    // Background color (dark)
+    let backgroundColor = vec3f(0.05, 0.05, 0.15);
+
+    // Mix background with combined layer colors
+    let hasAnyAlive = layer0Alive + layer1Alive;
+    let finalColor = mix(backgroundColor, combinedColor, min(hasAnyAlive, 1.0));
+
+    return vec4f(finalColor, 1.0);
 }

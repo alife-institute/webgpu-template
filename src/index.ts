@@ -13,11 +13,11 @@ async function main() {
   const device = await requestDevice();
   const canvas = configureCanvas(device);
 
-  // 2. Create simulation state texture
+  // 2. Create simulation state texture array with 2 layers
   // Using r32uint format with read_write access for in-place updates
   const stateTexture = device.createTexture({
-    label: "Simulation State",
-    size: [SIMULATION_SIZE.width, SIMULATION_SIZE.height],
+    label: "Simulation State Array",
+    size: [SIMULATION_SIZE.width, SIMULATION_SIZE.height, 2], // 2 layers
     format: "r32uint",
     usage:
       GPUTextureUsage.STORAGE_BINDING |
@@ -25,12 +25,17 @@ async function main() {
       GPUTextureUsage.COPY_DST,
   });
 
-  // 3. Initialize simulation state with random data
-  const initialData = new Uint32Array(
-    SIMULATION_SIZE.width * SIMULATION_SIZE.height
-  );
-  for (let i = 0; i < initialData.length; i++) {
-    // Random initial state (0 or 1)
+  // 3. Initialize simulation state with random data for both layers
+  const layerSize = SIMULATION_SIZE.width * SIMULATION_SIZE.height;
+  const initialData = new Uint32Array(layerSize * 2); // 2 layers
+
+  // Initialize layer 0
+  for (let i = 0; i < layerSize; i++) {
+    initialData[i] = Math.random() > 0.5 ? 1 : 0;
+  }
+
+  // Initialize layer 1
+  for (let i = layerSize; i < layerSize * 2; i++) {
     initialData[i] = Math.random() > 0.5 ? 1 : 0;
   }
 
@@ -41,7 +46,7 @@ async function main() {
       bytesPerRow: SIMULATION_SIZE.width * 4,
       rowsPerImage: SIMULATION_SIZE.height,
     },
-    [SIMULATION_SIZE.width, SIMULATION_SIZE.height]
+    [SIMULATION_SIZE.width, SIMULATION_SIZE.height, 2] // Write to both layers
   );
 
   // 4. Create compute pipeline for simulation
@@ -55,6 +60,7 @@ async function main() {
         storageTexture: {
           access: "read-write",
           format: "r32uint",
+          viewDimension: "2d-array",
         },
       },
     ],
@@ -83,7 +89,10 @@ async function main() {
       {
         binding: 1,
         visibility: GPUShaderStage.FRAGMENT,
-        texture: { sampleType: "uint" },
+        texture: {
+          sampleType: "uint",
+          viewDimension: "2d-array",
+        },
       },
     ],
   });
