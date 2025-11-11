@@ -1,3 +1,6 @@
+#import includes::bindings
+#import includes::textures
+
 /**
  * Compute Shader - Conway's Game of Life (In-Place Update)
  *
@@ -10,10 +13,8 @@
  * This pattern works well for simulations without neighbor dependencies.
  */
 
-@group(0) @binding(0) var stateTexture: texture_storage_2d_array<r32uint, read_write>;
-
 fn countNeighbors(pos: vec2i, layer: i32) -> u32 {
-    let size = vec2i(textureDimensions(stateTexture));
+    let size = vec2i(textureDimensions(states));
     var count = 0u;
 
     for (var dy = -1; dy <= 1; dy++) {
@@ -28,7 +29,7 @@ fn countNeighbors(pos: vec2i, layer: i32) -> u32 {
                 (pos.y + dy + size.y) % size.y
             );
 
-            let cell = textureLoad(stateTexture, neighbor, layer);
+            let cell = textureLoad(states, neighbor, layer);
             if (cell.r > 0u) {
                 count += 1u;
             }
@@ -41,14 +42,14 @@ fn countNeighbors(pos: vec2i, layer: i32) -> u32 {
 @compute @workgroup_size(16, 16)
 fn compute_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let pos = vec2i(global_id.xy);
-    let size = vec2i(textureDimensions(stateTexture));
+    let size = vec2i(textureDimensions(states));
 
     if (pos.x >= size.x || pos.y >= size.y) {
         return;
     }
 
     for (var layer = 0; layer < 2; layer++) {
-        let currentCell = textureLoad(stateTexture, pos, layer);
+        let currentCell = textureLoad(states, pos, layer);
         let isAlive = currentCell.r > 0u;
 
         let neighbors = countNeighbors(pos, layer);
@@ -67,6 +68,6 @@ fn compute_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             }
         }
 
-        textureStore(stateTexture, pos, layer, vec4u(newState, 0u, 0u, 0u));
+        textureStore(states, pos, layer, vec4u(newState, 0u, 0u, 0u));
     }
 }

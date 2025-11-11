@@ -2,148 +2,171 @@ import {
   configureCanvas,
   createShader,
   requestDevice,
+  setupInteractions,
   setupTextures,
 } from "./utils";
 
 import computeShader from "./shaders/compute.wgsl";
 import renderShader from "./shaders/render.wgsl";
 
-const SIMULATION_SIZE = { width: 512, height: 512 };
-const WORKGROUP_SIZE = 16;
+import bindings from "./shaders/includes/bindings.wgsl";
+import textures from "./shaders/includes/textures.wgsl";
+
+const shaderIncludes: Record<string, string> = {
+  bindings: bindings,
+  textures: textures,
+};
+
+const WORKGROUP_SIZE = 256;
 
 async function main() {
   const device = await requestDevice();
   const canvas = configureCanvas(device);
 
-  const { textures, bindingLayout } = setupTextures(
+  const GROUP_INDEX = 0;
+  const BINDINGS = [{
+      GROUP: GROUP_INDEX,
+      BUFFER: { CANVAS: 0, CONTROLS: 1, INTERACTIONS: 2},
+      TEXTURE: { STATES: 3}
+    }
+  ];
+
+  const textures = setupTextures(
     device,
-    [0],
+    Object.values(BINDINGS[GROUP_INDEX].TEXTURE),
     {},
     {
-      width: SIMULATION_SIZE.width,
-      height: SIMULATION_SIZE.height,
-      depthOrArrayLayers: { 0: 2 },
+      depthOrArrayLayers: {
+        [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: 2,
+      },
+      width: canvas.size.width,
+      height: canvas.size.height,
     },
-    { 0: "r32uint" }
+    {
+      [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: "r32uint",
+    }
   );
 
-  const stateTexture = textures[0];
+  const TEXTURE_WORKGROUP_COUNT: [number, number] = [
+    Math.ceil(textures.size.width / Math.sqrt(WORKGROUP_SIZE)),
+    Math.ceil(textures.size.height / Math.sqrt(WORKGROUP_SIZE)),
+  ];
 
-  const layerSize = SIMULATION_SIZE.width * SIMULATION_SIZE.height;
-  const initialData = new Uint32Array(layerSize * 2);
+  const interactions = setupInteractions(device, canvas.context.canvas, textures.size);
+  const canvas_buffers = {
+    [BINDINGS[GROUP_INDEX].BUFFER.CANVAS]: textures.canvas.buffer,
+    [BINDINGS[GROUP_INDEX].BUFFER.CONTROLS]: interactions.controls.buffer,
+    [BINDINGS[GROUP_INDEX].BUFFER.INTERACTIONS]: interactions.interactions.buffer,
+  };
 
-  for (let i = 0; i < layerSize * 2; i++) {
+  const depth = textures.size.depthOrArrayLayers ? textures.size.depthOrArrayLayers[BINDINGS[GROUP_INDEX].TEXTURE.STATES]: 1;
+  const arraySize = textures.size.width * textures.size.height * depth;
+  const initialData = new Uint32Array(arraySize)
+
+  for (let i = 0; i < arraySize; i++) {
     initialData[i] = Math.random() > 0.5 ? 1 : 0;
   }
 
   device.queue.writeTexture(
-    { texture: stateTexture },
+    { texture: textures.textures[BINDINGS[GROUP_INDEX].TEXTURE.STATES] },
     initialData,
     {
-      bytesPerRow: SIMULATION_SIZE.width * 4,
-      rowsPerImage: SIMULATION_SIZE.height,
+      bytesPerRow: textures.size.width * 4,
+      rowsPerImage: textures.size.height,
     },
-    [SIMULATION_SIZE.width, SIMULATION_SIZE.height, 2]
+    [textures.size.width, textures.size.height, depth]
   );
 
-  const computeModule = await createShader(device, computeShader);
-
-  const computeBindGroupLayout = device.createBindGroupLayout({
+  // Overall memory layout
+  const visibility = GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT;
+  const bindGroupLayout = device.createBindGroupLayout({
+    label: "bindGroupLayout",
     entries: [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: bindingLayout[0],
-      },
+      ...Object.values(BINDINGS[GROUP_INDEX].BUFFER).map((binding) => ({
+        binding: binding,
+        visibility: visibility,
+        buffer: { type: "uniform" as GPUBufferBindingType },
+      })),
+      ...Object.values(BINDINGS[GROUP_INDEX].TEXTURE).map((binding) => ({
+        binding: binding,
+        visibility: visibility,
+        storageTexture: textures.bindingLayout[binding],
+      })),
     ],
   });
 
+  const bindGroup = device.createBindGroup({
+    label: `Bind Group`,
+    layout: bindGroupLayout,
+    entries: [
+    ...Object.values(BINDINGS[GROUP_INDEX].TEXTURE).map((binding) => ({
+      binding,
+      resource: textures.textures[binding].createView(),
+    })),
+    ...Object.values(BINDINGS[GROUP_INDEX].BUFFER).map((binding) => ({
+      binding,
+      resource: { buffer: canvas_buffers[binding] },
+    })),
+    ],
+  });
+
+  const pipelineLayout = device.createPipelineLayout({
+    label: "pipelineLayout",
+    bindGroupLayouts: [bindGroupLayout],
+  });
+
+  const module = await createShader(device, computeShader, shaderIncludes);
   const computePipeline = device.createComputePipeline({
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [computeBindGroupLayout],
-    }),
-    compute: {
-      module: computeModule,
-      entryPoint: "compute_main",
-    },
+    layout: pipelineLayout,
+    compute: { module: module, entryPoint: "compute_main"},
   });
 
-  const renderModule = await createShader(device, renderShader);
-
-  const renderBindGroupLayout = device.createBindGroupLayout({
-    entries: [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.FRAGMENT,
-        texture: {
-          sampleType: "uint",
-          viewDimension: "2d-array",
-        },
-      },
-    ],
-  });
-
+  // Traditional render pipeline of vert -> frag
+  const renderModule = await createShader(device, renderShader, shaderIncludes);
   const renderPipeline = device.createRenderPipeline({
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [renderBindGroupLayout],
-    }),
+    label: "Render Pipeline",
+    layout: pipelineLayout,
     vertex: {
       module: renderModule,
-      entryPoint: "vertex_main",
+      entryPoint: "vert",
     },
     fragment: {
       module: renderModule,
-      entryPoint: "fragment_main",
-      targets: [{ format: canvas.format }],
+      entryPoint: "frag",
+      targets: [{ format: canvas.format }], // Stage 1 renders to intermediate texture
     },
     primitive: {
       topology: "triangle-list",
     },
   });
 
-  const computeBindGroup = device.createBindGroup({
-    label: "Compute Bind Group",
-    layout: computeBindGroupLayout,
-    entries: [{ binding: 0, resource: stateTexture.createView() }],
-  });
-
-  const renderBindGroup = device.createBindGroup({
-    label: "Render Bind Group",
-    layout: renderBindGroupLayout,
-    entries: [{ binding: 0, resource: stateTexture.createView() }],
-  });
-
-  const workgroupCount = [
-    Math.ceil(SIMULATION_SIZE.width / WORKGROUP_SIZE),
-    Math.ceil(SIMULATION_SIZE.height / WORKGROUP_SIZE),
-  ];
-
   function frame() {
     const encoder = device.createCommandEncoder();
 
-    const computePass = encoder.beginComputePass();
-    computePass.setPipeline(computePipeline);
-    computePass.setBindGroup(0, computeBindGroup);
-    computePass.dispatchWorkgroups(workgroupCount[0], workgroupCount[1]);
-    computePass.end();
+    const pass = encoder.beginComputePass();
+    pass.setBindGroup(GROUP_INDEX, bindGroup);
+
+    pass.setPipeline(computePipeline);
+    pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
+
+    pass.end();
 
     const renderPass = encoder.beginRenderPass({
       colorAttachments: [
         {
           view: canvas.context.getCurrentTexture().createView(),
-          loadOp: "clear",
-          clearValue: { r: 0.1, g: 0.1, b: 0.1, a: 1.0 },
+          loadOp: "load", // Load existing content from stage 1
           storeOp: "store",
         },
       ],
     });
     renderPass.setPipeline(renderPipeline);
-    renderPass.setBindGroup(0, renderBindGroup);
+    renderPass.setBindGroup(GROUP_INDEX, bindGroup);
+
     renderPass.draw(6);
     renderPass.end();
 
     device.queue.submit([encoder.finish()]);
-
     requestAnimationFrame(frame);
   }
 

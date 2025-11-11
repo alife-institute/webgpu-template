@@ -1,0 +1,1 @@
+@group(GROUP_INDEX) @binding(STATES) var states:  texture_storage_2d_array<r32uint, read_write>;

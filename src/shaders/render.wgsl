@@ -1,11 +1,12 @@
+#import includes::bindings
+#import includes::textures
+
 /**
  * Render Shader - Displays the simulation on screen
  *
  * Vertex Shader: Hard-coded full-screen quad
  * Fragment Shader: Samples the simulation texture and applies colors
  */
-
-@group(0) @binding(0) var simulationTexture: texture_2d_array<u32>;
 
 struct VertexOutput {
     @builtin(position) position: vec4f,
@@ -14,7 +15,7 @@ struct VertexOutput {
 
 // Hard-coded full-screen quad (6 vertices for 2 triangles)
 @vertex
-fn vertex_main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
+fn vert(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
     var output: VertexOutput;
 
     // Define a full-screen quad using two triangles (6 vertices)
@@ -47,12 +48,12 @@ fn vertex_main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
  * - Both layers: White (overlap)
  */
 @fragment
-fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
-    let texSize = vec2f(textureDimensions(simulationTexture));
+fn frag(input: VertexOutput) -> @location(0) vec4f {
+    let texSize = vec2f(textureDimensions(states));
     let pixelCoord = vec2i(input.texCoord * texSize);
 
-    let layer0State = textureLoad(simulationTexture, pixelCoord, 0, 0);
-    let layer1State = textureLoad(simulationTexture, pixelCoord, 1, 0);
+    let layer0State = textureLoad(states, pixelCoord, 0);
+    let layer1State = textureLoad(states, pixelCoord, 1);
 
     let layer0Alive = f32(layer0State.r);
     let layer1Alive = f32(layer1State.r);
