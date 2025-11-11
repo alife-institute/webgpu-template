@@ -12,16 +12,14 @@
 
 @group(0) @binding(0) var stateTexture: texture_storage_2d_array<r32uint, read_write>;
 
-// Count the number of alive neighbors around a cell in a specific layer
 fn countNeighbors(pos: vec2i, layer: i32) -> u32 {
     let size = vec2i(textureDimensions(stateTexture));
     var count = 0u;
 
-    // Check all 8 neighbors
     for (var dy = -1; dy <= 1; dy++) {
         for (var dx = -1; dx <= 1; dx++) {
             if (dx == 0 && dy == 0) {
-                continue; // Skip the center cell
+                continue;
             }
 
             // Wrap around edges (toroidal topology)
@@ -45,21 +43,17 @@ fn compute_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let pos = vec2i(global_id.xy);
     let size = vec2i(textureDimensions(stateTexture));
 
-    // Boundary check
     if (pos.x >= size.x || pos.y >= size.y) {
         return;
     }
 
-    // Process both layers independently
     for (var layer = 0; layer < 2; layer++) {
-        // Get current cell state for this layer
         let currentCell = textureLoad(stateTexture, pos, layer);
         let isAlive = currentCell.r > 0u;
 
-        // Count neighbors for this layer
         let neighbors = countNeighbors(pos, layer);
 
-        // Apply Game of Life rules
+        // Game of Life rules
         var newState = 0u;
         if (isAlive) {
             // Survival: 2 or 3 neighbors
@@ -73,7 +67,6 @@ fn compute_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             }
         }
 
-        // Write result back to same texture layer
         textureStore(stateTexture, pos, layer, vec4u(newState, 0u, 0u, 0u));
     }
 }

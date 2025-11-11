@@ -7,16 +7,12 @@
 
 @group(0) @binding(0) var simulationTexture: texture_2d_array<u32>;
 
-// Vertex shader output / Fragment shader input
 struct VertexOutput {
     @builtin(position) position: vec4f,
     @location(0) texCoord: vec2f,
 };
 
-/**
- * Vertex Shader - Hard-coded full-screen quad
- * No vertex buffer needed! This generates 6 vertices for 2 triangles.
- */
+// Hard-coded full-screen quad (6 vertices for 2 triangles)
 @vertex
 fn vertex_main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
     var output: VertexOutput;
@@ -52,33 +48,22 @@ fn vertex_main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
  */
 @fragment
 fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
-    // Get texture dimensions and convert normalized coords to pixel coords
     let texSize = vec2f(textureDimensions(simulationTexture));
     let pixelCoord = vec2i(input.texCoord * texSize);
 
-    // Load the simulation state from both layers
-    // textureLoad for texture_2d_array requires: (texture, coords, array_index, mip_level)
     let layer0State = textureLoad(simulationTexture, pixelCoord, 0, 0);
     let layer1State = textureLoad(simulationTexture, pixelCoord, 1, 0);
 
-    // Convert uint to float for color interpolation
     let layer0Alive = f32(layer0State.r);
     let layer1Alive = f32(layer1State.r);
 
-    // Color mapping for two layers:
-    // Layer 0: Cyan (0, 1, 1) when alive
-    // Layer 1: Magenta (1, 0, 1) when alive
-    // Both: White (additive mixing)
-    let layer0Color = vec3f(0.0, 1.0, 1.0) * layer0Alive;  // Cyan
-    let layer1Color = vec3f(1.0, 0.0, 1.0) * layer1Alive;  // Magenta
+    // Color mapping: Layer 0 = Cyan, Layer 1 = Magenta, Both = White (additive)
+    let layer0Color = vec3f(0.0, 1.0, 1.0) * layer0Alive;
+    let layer1Color = vec3f(1.0, 0.0, 1.0) * layer1Alive;
 
-    // Combine layers additively
     let combinedColor = layer0Color + layer1Color;
-
-    // Background color (dark)
     let backgroundColor = vec3f(0.05, 0.05, 0.15);
 
-    // Mix background with combined layer colors
     let hasAnyAlive = layer0Alive + layer1Alive;
     let finalColor = mix(backgroundColor, combinedColor, min(hasAnyAlive, 1.0));
 

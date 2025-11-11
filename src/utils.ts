@@ -1,8 +1,3 @@
-/**
- * WebGPU Utility Functions
- * Simple helper functions for WebGPU setup and configuration
- */
-
 function throwDetectionError(error: string): never {
   const errorElement = document.querySelector(
     ".webgpu-not-supported"
@@ -13,9 +8,6 @@ function throwDetectionError(error: string): never {
   throw new Error("Could not initialize WebGPU: " + error);
 }
 
-/**
- * Request a WebGPU device with optional features and limits
- */
 export async function requestDevice(
   options: GPURequestAdapterOptions = {
     powerPreference: "high-performance",
@@ -32,21 +24,16 @@ export async function requestDevice(
 
   const features = [...requiredFeatures];
 
-  // Instead of passing a record that might have undefined values, filter them out:
   const limits = Object.fromEntries(
     Object.entries(requiredLimits).filter(([key, value]) => value !== undefined)
   ) as Record<string, number>;
 
-  // Then use the filtered limits object:
   return adapter.requestDevice({
     requiredFeatures: features,
     requiredLimits: limits,
   });
 }
 
-/**
- * Configure a canvas for WebGPU rendering
- */
 export function configureCanvas(
   device: GPUDevice,
   size = { width: window.innerWidth, height: window.innerHeight }
@@ -78,7 +65,6 @@ export async function createShader(
   code: string,
   includes?: Record<string, string>
 ): Promise<GPUShaderModule> {
-  // Process the code with imports
   const processedCode = prependIncludes(code, includes);
 
   const module = device.createShaderModule({ code: processedCode });
@@ -93,24 +79,15 @@ export async function createShader(
   return module;
 }
 
-/**
- * Process import statements in shader code to include the content of referenced modules
- * @param code - The shader code containing import statements
- * @param includes - Optional mapping of module names to their content
- * @returns The processed shader code with imports resolved
- */
 function prependIncludes(
   code: string,
   includes?: Record<string, string>
 ): string {
-  // Extract import statements
   const importRegex = /^#import\s+([a-zA-Z0-9_]+)::([a-zA-Z0-9_]+)/gm;
   const imports = [...code.matchAll(importRegex)];
 
-  // Build a map of imports to their content
   const includesToAdd: Record<string, string> = {};
 
-  // Process each import
   for (const [fullMatch, namespace, moduleName] of imports) {
     if (namespace === "includes" && includes && moduleName in includes) {
       includesToAdd[fullMatch] = includes[moduleName];
@@ -119,10 +96,8 @@ function prependIncludes(
     }
   }
 
-  // Replace import statements with their content
   let processedCode = code;
   for (const [importStatement, content] of Object.entries(includesToAdd)) {
-    // Replace the import statement with the content
     processedCode = processedCode.replace(importStatement, content);
   }
 
@@ -155,12 +130,10 @@ export function setupInteractions(
 
   uniformBufferData.set([position.x, position.y]);
   if (canvas instanceof HTMLCanvasElement) {
-    // disable context menu
     canvas.addEventListener("contextmenu", (event) => {
       event.preventDefault();
     });
 
-    // move events
     ["mousemove", "touchmove"].forEach((type) => {
       canvas.addEventListener(
         type,
@@ -288,7 +261,10 @@ export function setupTextures(
 
   bindings.forEach((key) => {
     textures[key] = device.createTexture({
-      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_DST,
+      usage:
+        GPUTextureUsage.STORAGE_BINDING |
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST,
       format: format && key in format ? format[key] : DEFAULT_FORMAT,
       size: {
         width: size.width,
@@ -401,8 +377,6 @@ function zeros(
 }
 
 export function getRandomValues(length: number): Uint32Array {
-  // fast cpu-side random number generation
-
   const maxChunkLength = 65536 / 4;
   const result = new Uint32Array(4 * length);
   for (let i = 0; i < 4 * length; i += maxChunkLength) {

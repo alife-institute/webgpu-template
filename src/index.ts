@@ -1,41 +1,38 @@
-import { configureCanvas, createShader, requestDevice } from "./utils";
+import {
+  configureCanvas,
+  createShader,
+  requestDevice,
+  setupTextures,
+} from "./utils";
 
-// Import shaders
 import computeShader from "./shaders/compute.wgsl";
 import renderShader from "./shaders/render.wgsl";
 
-// Simulation parameters - easy to modify for workshop participants
 const SIMULATION_SIZE = { width: 512, height: 512 };
-const WORKGROUP_SIZE = 16; // 16x16 threads per workgroup
+const WORKGROUP_SIZE = 16;
 
 async function main() {
-  // 1. Initialize WebGPU
   const device = await requestDevice();
   const canvas = configureCanvas(device);
 
-  // 2. Create simulation state texture array with 2 layers
-  // Using r32uint format with read_write access for in-place updates
-  const stateTexture = device.createTexture({
-    label: "Simulation State Array",
-    size: [SIMULATION_SIZE.width, SIMULATION_SIZE.height, 2], // 2 layers
-    format: "r32uint",
-    usage:
-      GPUTextureUsage.STORAGE_BINDING |
-      GPUTextureUsage.TEXTURE_BINDING |
-      GPUTextureUsage.COPY_DST,
-  });
+  const { textures, bindingLayout } = setupTextures(
+    device,
+    [0],
+    {},
+    {
+      width: SIMULATION_SIZE.width,
+      height: SIMULATION_SIZE.height,
+      depthOrArrayLayers: { 0: 2 },
+    },
+    { 0: "r32uint" }
+  );
 
-  // 3. Initialize simulation state with random data for both layers
+  const stateTexture = textures[0];
+
   const layerSize = SIMULATION_SIZE.width * SIMULATION_SIZE.height;
-  const initialData = new Uint32Array(layerSize * 2); // 2 layers
+  const initialData = new Uint32Array(layerSize * 2);
 
-  // Initialize layer 0
-  for (let i = 0; i < layerSize; i++) {
-    initialData[i] = Math.random() > 0.5 ? 1 : 0;
-  }
-
-  // Initialize layer 1
-  for (let i = layerSize; i < layerSize * 2; i++) {
+  for (let i = 0; i < layerSize * 2; i++) {
     initialData[i] = Math.random() > 0.5 ? 1 : 0;
   }
 
@@ -46,10 +43,9 @@ async function main() {
       bytesPerRow: SIMULATION_SIZE.width * 4,
       rowsPerImage: SIMULATION_SIZE.height,
     },
-    [SIMULATION_SIZE.width, SIMULATION_SIZE.height, 2] // Write to both layers
+    [SIMULATION_SIZE.width, SIMULATION_SIZE.height, 2]
   );
 
-  // 4. Create compute pipeline for simulation
   const computeModule = await createShader(device, computeShader);
 
   const computeBindGroupLayout = device.createBindGroupLayout({
@@ -57,11 +53,7 @@ async function main() {
       {
         binding: 0,
         visibility: GPUShaderStage.COMPUTE,
-        storageTexture: {
-          access: "read-write",
-          format: "r32uint",
-          viewDimension: "2d-array",
-        },
+        storageTexture: bindingLayout[0],
       },
     ],
   });
@@ -76,7 +68,6 @@ async function main() {
     },
   });
 
-  // 5. Create render pipeline for visualization
   const renderModule = await createShader(device, renderShader);
 
   const renderBindGroupLayout = device.createBindGroupLayout({
@@ -110,13 +101,6 @@ async function main() {
     },
   });
 
-  // 6. Create sampler for rendering
-  const sampler = device.createSampler({
-    magFilter: "nearest",
-    minFilter: "nearest",
-  });
-
-  // 7. Create bind groups
   const computeBindGroup = device.createBindGroup({
     label: "Compute Bind Group",
     layout: computeBindGroupLayout,
@@ -129,7 +113,6 @@ async function main() {
     entries: [{ binding: 0, resource: stateTexture.createView() }],
   });
 
-  // 8. Animation loop
   const workgroupCount = [
     Math.ceil(SIMULATION_SIZE.width / WORKGROUP_SIZE),
     Math.ceil(SIMULATION_SIZE.height / WORKGROUP_SIZE),
@@ -138,14 +121,12 @@ async function main() {
   function frame() {
     const encoder = device.createCommandEncoder();
 
-    // Compute pass: update state in-place
     const computePass = encoder.beginComputePass();
     computePass.setPipeline(computePipeline);
     computePass.setBindGroup(0, computeBindGroup);
     computePass.dispatchWorkgroups(workgroupCount[0], workgroupCount[1]);
     computePass.end();
 
-    // Render pass: draw state to canvas
     const renderPass = encoder.beginRenderPass({
       colorAttachments: [
         {
@@ -158,7 +139,7 @@ async function main() {
     });
     renderPass.setPipeline(renderPipeline);
     renderPass.setBindGroup(0, renderBindGroup);
-    renderPass.draw(6); // Draw full-screen quad (6 vertices)
+    renderPass.draw(6);
     renderPass.end();
 
     device.queue.submit([encoder.finish()]);

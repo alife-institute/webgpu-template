@@ -1,5 +1,6 @@
 const path = require("path");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
+const FaviconsWebpackPlugin = require('favicons-webpack-plugin');
 
 module.exports = {
   mode: "development",
@@ -15,6 +16,7 @@ module.exports = {
       title: "WebGPU Template",
       template: "src/index.html",
     }),
+    new FaviconsWebpackPlugin('src/assets/favicon.ico'),
   ],
   module: {
     rules: [
