@@ -1,6 +1,5 @@
 {
     "editor.formatOnSave": true,
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "typescript.tsdk": "node_modules/typescript/lib",
     "files.exclude": {
         "**/*.js": {
@@ -10,14 +9,5 @@
             "when": "$(basename).tsx"
         },
         "**/*.js.map": true,
-    },
-    "[wgsl]": {
-        "editor.tabSize": 2
-    },
-    "[typescript]": {
-        "editor.tabSize": 2
-    },
-    "[html]": {
-        "editor.tabSize": 2
-    },
+    }
 }

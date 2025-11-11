@@ -115,3 +115,13 @@ npm start # hot-reload on localhost:5500
 ```
 
 **Do NOT run `npm start`** - The development server is for human interactive debugging and visualization only. The capture tool provides everything needed for automated validation.
+
+## Coding practices
+
+### General
+
+- Self-documenting code. Prefer clear naming of variables and functions. In most cases the logic of the program is evident from control flow and variable names so **do NOT comment code** absolutely necessary.
+
+### WebGPU
+
+Prefer using `texture_2d_array`

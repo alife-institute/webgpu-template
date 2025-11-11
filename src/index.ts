@@ -1,4 +1,4 @@
-import { requestDevice, configureCanvas, createShaderModule } from "./utils";
+import { configureCanvas, createShader, requestDevice } from "./utils";
 
 // Import shaders
 import computeShader from "./shaders/compute.wgsl";
@@ -50,7 +50,7 @@ async function main() {
   );
 
   // 4. Create compute pipeline for simulation
-  const computeModule = await createShaderModule(device, computeShader);
+  const computeModule = await createShader(device, computeShader);
 
   const computeBindGroupLayout = device.createBindGroupLayout({
     entries: [
@@ -77,17 +77,12 @@ async function main() {
   });
 
   // 5. Create render pipeline for visualization
-  const renderModule = await createShaderModule(device, renderShader);
+  const renderModule = await createShader(device, renderShader);
 
   const renderBindGroupLayout = device.createBindGroupLayout({
     entries: [
       {
         binding: 0,
-        visibility: GPUShaderStage.FRAGMENT,
-        sampler: { type: "non-filtering" },
-      },
-      {
-        binding: 1,
         visibility: GPUShaderStage.FRAGMENT,
         texture: {
           sampleType: "uint",
@@ -131,10 +126,7 @@ async function main() {
   const renderBindGroup = device.createBindGroup({
     label: "Render Bind Group",
     layout: renderBindGroupLayout,
-    entries: [
-      { binding: 0, resource: sampler },
-      { binding: 1, resource: stateTexture.createView() },
-    ],
+    entries: [{ binding: 0, resource: stateTexture.createView() }],
   });
 
   // 8. Animation loop

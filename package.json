@@ -2,7 +2,6 @@
   "name": "webgpu-template",
   "version": "1.0.0",
   "description": "A template project for WebGPU development using TypeScript and Webpack.",
-  "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "webpack serve --port 5500",
@@ -17,12 +16,18 @@
     "@webgpu/types": "^0.1.46",
     "html-webpack-plugin": "^5.6.0",
     "ts-loader": "^9.5.1",
-    "typescript": "^5.6.2",
     "webpack": "^5.94.0",
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^5.1.0"
   },
   "devDependencies": {
-    "puppeteer": "^24.29.1"
+    "@eslint/js": "^9.39.1",
+    "@typescript-eslint/eslint-plugin": "^8.46.4",
+    "@typescript-eslint/parser": "^8.46.4",
+    "eslint": "^9.39.1",
+    "eslint-webpack-plugin": "^5.0.2",
+    "puppeteer": "^24.29.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.4"
   }
 }

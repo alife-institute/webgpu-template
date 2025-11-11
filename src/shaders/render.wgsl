@@ -5,8 +5,7 @@
  * Fragment Shader: Samples the simulation texture and applies colors
  */
 
-@group(0) @binding(0) var texSampler: sampler;
-@group(0) @binding(1) var simulationTexture: texture_2d_array<u32>;
+@group(0) @binding(0) var simulationTexture: texture_2d_array<u32>;
 
 // Vertex shader output / Fragment shader input
 struct VertexOutput {
