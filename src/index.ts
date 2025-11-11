@@ -1,9 +1,10 @@
 import {
   configureCanvas,
   createShader,
+  random,
   requestDevice,
   setupInteractions,
-  setupTextures,
+  setupTextures
 } from "./utils";
 
 import computeShader from "./shaders/compute.wgsl";
@@ -23,6 +24,7 @@ async function main() {
   const device = await requestDevice();
   const canvas = configureCanvas(device);
 
+  // binding indexes matching `shaders/includes/bindings.wgsl`
   const GROUP_INDEX = 0;
   const BINDINGS = [{
       GROUP: GROUP_INDEX,
@@ -33,16 +35,18 @@ async function main() {
 
   const textures = setupTextures(
     device,
-    Object.values(BINDINGS[GROUP_INDEX].TEXTURE),
-    {},
-    {
+    /*bindings=*/ Object.values(BINDINGS[GROUP_INDEX].TEXTURE),
+    /*data=*/ {
+      [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: random(canvas.size.height, canvas.size.width, 2),
+    },
+    /*size=*/ {
       depthOrArrayLayers: {
         [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: 2,
       },
       width: canvas.size.width,
       height: canvas.size.height,
     },
-    {
+    /*format=*/ {
       [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: "r32uint",
     }
   );
@@ -59,25 +63,7 @@ async function main() {
     [BINDINGS[GROUP_INDEX].BUFFER.INTERACTIONS]: interactions.interactions.buffer,
   };
 
-  const depth = textures.size.depthOrArrayLayers ? textures.size.depthOrArrayLayers[BINDINGS[GROUP_INDEX].TEXTURE.STATES]: 1;
-  const arraySize = textures.size.width * textures.size.height * depth;
-  const initialData = new Uint32Array(arraySize)
-
-  for (let i = 0; i < arraySize; i++) {
-    initialData[i] = Math.random() > 0.5 ? 1 : 0;
-  }
-
-  device.queue.writeTexture(
-    { texture: textures.textures[BINDINGS[GROUP_INDEX].TEXTURE.STATES] },
-    initialData,
-    {
-      bytesPerRow: textures.size.width * 4,
-      rowsPerImage: textures.size.height,
-    },
-    [textures.size.width, textures.size.height, depth]
-  );
-
-  // Overall memory layout
+  // overall memory layout
   const visibility = GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT;
   const bindGroupLayout = device.createBindGroupLayout({
     label: "bindGroupLayout",
@@ -99,14 +85,14 @@ async function main() {
     label: `Bind Group`,
     layout: bindGroupLayout,
     entries: [
-    ...Object.values(BINDINGS[GROUP_INDEX].TEXTURE).map((binding) => ({
-      binding,
-      resource: textures.textures[binding].createView(),
-    })),
-    ...Object.values(BINDINGS[GROUP_INDEX].BUFFER).map((binding) => ({
-      binding,
-      resource: { buffer: canvas_buffers[binding] },
-    })),
+      ...Object.values(BINDINGS[GROUP_INDEX].TEXTURE).map((binding) => ({
+        binding,
+        resource: textures.textures[binding].createView(),
+      })),
+      ...Object.values(BINDINGS[GROUP_INDEX].BUFFER).map((binding) => ({
+        binding,
+        resource: { buffer: canvas_buffers[binding] },
+      })),
     ],
   });
 
@@ -115,13 +101,14 @@ async function main() {
     bindGroupLayouts: [bindGroupLayout],
   });
 
+  // compute pipeline
   const module = await createShader(device, computeShader, shaderIncludes);
   const computePipeline = device.createComputePipeline({
     layout: pipelineLayout,
     compute: { module: module, entryPoint: "compute_main"},
   });
 
-  // Traditional render pipeline of vert -> frag
+  // traditional render pipeline of vert -> frag
   const renderModule = await createShader(device, renderShader, shaderIncludes);
   const renderPipeline = device.createRenderPipeline({
     label: "Render Pipeline",
@@ -133,7 +120,7 @@ async function main() {
     fragment: {
       module: renderModule,
       entryPoint: "frag",
-      targets: [{ format: canvas.format }], // Stage 1 renders to intermediate texture
+      targets: [{ format: canvas.format }],
     },
     primitive: {
       topology: "triangle-list",
@@ -143,19 +130,21 @@ async function main() {
   function frame() {
     const encoder = device.createCommandEncoder();
 
+    // compute pass
     const pass = encoder.beginComputePass();
     pass.setBindGroup(GROUP_INDEX, bindGroup);
 
     pass.setPipeline(computePipeline);
-    pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
+    pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT); // in-place state update
 
     pass.end();
 
+    // render pass
     const renderPass = encoder.beginRenderPass({
       colorAttachments: [
         {
           view: canvas.context.getCurrentTexture().createView(),
-          loadOp: "load", // Load existing content from stage 1
+          loadOp: "load", // load existing content
           storeOp: "store",
         },
       ],
@@ -163,9 +152,10 @@ async function main() {
     renderPass.setPipeline(renderPipeline);
     renderPass.setBindGroup(GROUP_INDEX, bindGroup);
 
-    renderPass.draw(6);
+    renderPass.draw(6); // draw two triangles for a fullscreen quad
     renderPass.end();
 
+    // submit commands
     device.queue.submit([encoder.finish()]);
     requestAnimationFrame(frame);
   }

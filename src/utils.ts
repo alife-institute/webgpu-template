@@ -376,6 +376,28 @@ function zeros(
   return zeroArray;
 }
 
+export function random(
+  height: number,
+  width: number,
+  layers: number = 1
+): number[][][] {
+  const randomArray: number[][][] = [];
+
+  for (let i = 0; i < height; i++) {
+    const row: number[][] = [];
+    for (let j = 0; j < width; j++) {
+      const layer: number[] = [];
+      for (let k = 0; k < layers; k++) {
+        layer.push(Math.random() > 0.5 ? 1 : 0);
+      }
+      row.push(layer);
+    }
+    randomArray.push(row);
+  }
+
+  return randomArray;
+}
+
 export function getRandomValues(length: number): Uint32Array {
   const maxChunkLength = 65536 / 4;
   const result = new Uint32Array(4 * length);
