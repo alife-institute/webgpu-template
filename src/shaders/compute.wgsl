@@ -43,24 +43,17 @@ fn apply_rule(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
 
-    // canvas interaction
-    var brush = false;
+    // Canvas interaction: per-layer brush painting
     let x = vec2<f32>(idx);
-    let y = interactions.position;
-
     let dims = vec2<f32>(size);
-    let distance = length((x - y) - dims * floor((x - y) / dims + 0.5));
+    let distance = length((x - interactions.position) - dims * floor((x - interactions.position) / dims + 0.5));
 
+    let layer = select(0, 1, sign(interactions.size) > 0.0);
     if distance < abs(interactions.size) {
-        brush = true;
+        textureStore(states, idx, layer, vec4u(1u, 0u, 0u, 0u));
     }
 
     for (var layer = 0; layer < 2; layer++) {
-
-        if brush {
-            textureStore(states, idx, layer, vec4u(1u, 0u, 0u, 0u));
-            continue;
-        }
 
         let currentCell = textureLoad(states, idx, layer);
         let isAlive = currentCell.r > 0u;
