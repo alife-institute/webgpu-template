@@ -108,7 +108,7 @@ export function setupInteractions(
   device: GPUDevice,
   canvas: HTMLCanvasElement | OffscreenCanvas,
   texture: { width: number; height: number },
-  size: number = 10
+  size: number = 20
 ): {
   interactions: {
     data: Float32Array;

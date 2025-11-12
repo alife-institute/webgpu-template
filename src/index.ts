@@ -11,11 +11,13 @@ import computeShader from "./shaders/compute.wgsl";
 import renderShader from "./shaders/render.wgsl";
 
 import bindings from "./shaders/includes/bindings.wgsl";
+import interactions from "./shaders/includes/interactions.wgsl";
 import textures from "./shaders/includes/textures.wgsl";
 
 const shaderIncludes: Record<string, string> = {
   bindings: bindings,
   textures: textures,
+  interactions: interactions,
 };
 
 const WORKGROUP_SIZE = 256;
@@ -128,6 +130,14 @@ async function main() {
   });
 
   function frame() {
+
+    // update interaction parameters
+    device.queue.writeBuffer(
+      /*buffer=*/ interactions.interactions.buffer,
+      /*offset=*/ 0,
+      /*data=*/ interactions.interactions.data.buffer
+    );
+
     const encoder = device.createCommandEncoder();
 
     // compute pass

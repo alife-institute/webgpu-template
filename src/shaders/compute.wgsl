@@ -1,5 +1,6 @@
 #import includes::bindings
 #import includes::textures
+#import includes::interactions
 
 /**
  * Compute Shader - Conway's Game of Life (In-Place Update)
@@ -48,7 +49,25 @@ fn compute_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         return;
     }
 
+    // canvas interaction
+    var brush = false;
+    let x = vec2<f32>(pos);
+    let y = interactions.position;
+
+    let dims = vec2<f32>(canvas.size);
+    let distance = length((x - y) - dims * floor((x - y) / dims + 0.5));
+
+    if distance < abs(interactions.size) {
+        brush = true;
+    }
+
     for (var layer = 0; layer < 2; layer++) {
+
+        if brush {
+            textureStore(states, pos, layer, vec4u(1u, 0u, 0u, 0u));
+            continue;
+        }
+
         let currentCell = textureLoad(states, pos, layer);
         let isAlive = currentCell.r > 0u;
 
