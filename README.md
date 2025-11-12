@@ -37,10 +37,14 @@ npm start
 ```
 src/
 ├── index.ts              # Main application setup
-├── utils.ts              # WebGPU utility functions
+├── utils.ts              # WebGPU utility functions (includes setupTextures)
+├── assets/               # Static assets (images, etc.)
 └── shaders/
     ├── compute.wgsl      # Compute shader (simulation logic)
-    └── render.wgsl       # Render shader (vertex + fragment)
+    ├── render.wgsl       # Render shader (vertex + fragment)
+    └── includes/         # Shared WGSL code (imported via #import)
+        ├── bindings.wgsl # Binding layout definitions
+        └── textures.wgsl # Texture declarations
 ```
 
 ## How It Works
@@ -53,10 +57,41 @@ Initialize State → Compute Shader (in-place update) → Render Shader → Disp
                    Update Logic (read & write same texture)
 ```
 
-### 2. In-Place State Updates
+### 2. Includes System for Shared WGSL Code
+
+The template uses a custom `#import` system to share code across shaders:
+
+**In TypeScript** (`index.ts`):
+```typescript
+import bindings from "./shaders/includes/bindings.wgsl";
+import textures from "./shaders/includes/textures.wgsl";
+
+const shaderIncludes: Record<string, string> = {
+  bindings: bindings,
+  textures: textures,
+};
+
+// Pass includes when creating shaders
+const module = await createShader(device, computeShader, shaderIncludes);
+```
+
+**In WGSL** (any `.wgsl` file):
+```wgsl
+#import includes::bindings  // Imports binding layout definitions
+#import includes::textures  // Imports texture declarations
+
+// Now you can use BINDINGS and texture variables
+```
+
+**Benefits**:
+- **Single source of truth**: Binding indices defined once in `includes/bindings.wgsl`
+- **No duplication**: Texture declarations shared across compute and render shaders
+- **Easy to extend**: Add new textures by updating includes files only
+
+### 3. In-Place State Updates
 
 This template uses a single read-write storage texture for simplicity:
-- **stateTexture**: Single texture with `read_write` access
+- **states texture**: 2D array texture with `read_write` access (supports multiple layers)
 - Compute shader reads neighbors, then writes new state to same texture
 - **Note**: For cellular automata, this creates race conditions (cells may read mixed old/new states)
 - Result: Interesting visual artifacts but not "correct" Game of Life
@@ -64,7 +99,7 @@ This template uses a single read-write storage texture for simplicity:
 For deterministic cellular automata, use double-buffering (see git history).
 This pattern works well for simulations without strict neighbor dependencies.
 
-### 3. Shader Pipeline
+### 4. Shader Pipeline
 
 **Compute Shader** (`compute.wgsl`):
 - Runs on the GPU in parallel
@@ -82,11 +117,84 @@ This pattern works well for simulations without strict neighbor dependencies.
 
 ## Modifying the Simulation
 
+### Adding or Editing Textures
+
+The `setupTextures` utility in `utils.ts` simplifies texture management:
+
+**Step 1: Define binding indices** in `src/shaders/includes/bindings.wgsl`:
+```wgsl
+struct TextureBindings {
+  STATES: i32,
+  VELOCITIES: i32,  // Add new texture binding
+}
+
+const BINDINGS = array<Bindings, 1>(
+  Bindings(
+    GROUP_INDEX,
+    BufferBindings(0,1,2),
+    TextureBindings(3, 4),  // Update indices
+));
+```
+
+**Step 2: Declare texture** in `src/shaders/includes/textures.wgsl`:
+```wgsl
+@group(GROUP_INDEX) @binding(BINDINGS[GROUP_INDEX].TEXTURE.STATES)
+  var states: texture_storage_2d_array<r32uint, read_write>;
+
+@group(GROUP_INDEX) @binding(BINDINGS[GROUP_INDEX].TEXTURE.VELOCITIES)
+  var velocities: texture_storage_2d_array<rg32float, read_write>;  // Add new texture
+```
+
+**Step 3: Initialize in TypeScript** (`src/index.ts`):
+```typescript
+const BINDINGS = [{
+  GROUP: GROUP_INDEX,
+  BUFFER: { CANVAS: 0, CONTROLS: 1, INTERACTIONS: 2 },
+  TEXTURE: { STATES: 3, VELOCITIES: 4 }  // Add new texture
+}];
+
+const textures = setupTextures(
+  device,
+  /*bindings=*/ Object.values(BINDINGS[GROUP_INDEX].TEXTURE),  // Automatically includes all textures
+  /*data=*/ {
+    [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: random(canvas.size.height, canvas.size.width, 2),
+    [BINDINGS[GROUP_INDEX].TEXTURE.VELOCITIES]: zeros(canvas.size.height, canvas.size.width, 2),  // Initialize new texture
+  },
+  /*size=*/ {
+    depthOrArrayLayers: {
+      [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: 2,
+      [BINDINGS[GROUP_INDEX].TEXTURE.VELOCITIES]: 2,  // Specify layers
+    },
+    width: canvas.size.width,
+    height: canvas.size.height,
+  },
+  /*format=*/ {
+    [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: "r32uint",
+    [BINDINGS[GROUP_INDEX].TEXTURE.VELOCITIES]: "rg32float",  // Specify format
+  }
+);
+```
+
+**That's it!** The `setupTextures` utility handles:
+- Creating GPU textures with correct usage flags
+- Setting up bind group layouts automatically
+- Uploading initial data to textures
+- Configuring 2D vs 2D-array based on layer count
+
 ### Change Simulation Size
 
-In `src/index.ts`:
+Simulation size is automatically set to match canvas dimensions. To change it, modify canvas size in `utils.ts`:
+
 ```typescript
-const SIMULATION_SIZE = { width: 512, height: 512 }; // Change these values
+export function configureCanvas(
+  device: GPUDevice,
+  size = { width: 512, height: 512 }  // Change default size here
+)
+```
+
+Or pass custom size when calling `configureCanvas` in `index.ts`:
+```typescript
+const canvas = configureCanvas(device, { width: 1024, height: 1024 });
 ```
 
 ### Implement Your Own Simulation
@@ -94,19 +202,22 @@ const SIMULATION_SIZE = { width: 512, height: 512 }; // Change these values
 Edit `src/shaders/compute.wgsl`:
 
 ```wgsl
+#import includes::bindings
+#import includes::textures
+
 @compute @workgroup_size(16, 16)
 fn compute_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let pos = vec2i(global_id.xy);
 
-    // 1. Read current state
-    let currentState = textureLoad(inputTexture, pos, 0);
+    // 1. Read current state from texture (specify layer)
+    let currentState = textureLoad(states, pos, 0);
 
     // 2. Implement your simulation logic here
-    var newState = vec4f(0.0);
+    var newState = vec4u(0u);
     // ... your calculations ...
 
     // 3. Write new state
-    textureStore(outputTexture, pos, newState);
+    textureStore(states, pos, 0, newState);
 }
 ```
 
@@ -127,52 +238,6 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
     return vec4f(color, 1.0);
 }
 ```
-
-## Example Simulations to Try
-
-### 1. Reaction-Diffusion
-
-Simulate chemical reactions and diffusion (creates pattern formation).
-
-### 2. Heat Equation
-
-Simulate heat spreading across a surface.
-
-### 3. Wave Equation
-
-Simulate ripples and wave propagation.
-
-### 4. Particle Systems
-
-Simulate many particles with simple physics.
-
-### 5. Cellular Automata
-
-Like the included Game of Life, but try other rules!
-
-## Tips for Workshop Participants
-
-1. **Start Simple**: Modify the existing Game of Life rules first
-2. **Use Colors**: Visualize different states with different colors
-3. **Debug Visually**: Map intermediate calculations to colors to see what's happening
-4. **Experiment**: Try changing constants and see what happens
-5. **Read Comments**: The code is heavily commented to help you understand
-
-## Common Issues
-
-### Browser Compatibility
-
-If you see "WebGPU is not supported", make sure you're using:
-- Chrome/Edge 113+ with WebGPU enabled
-- Safari 18+ with WebGPU enabled
-- Latest Firefox Nightly with WebGPU enabled
-
-### Performance
-
-If the simulation is slow:
-1. Reduce `SIMULATION_SIZE` in `index.ts`
-2. Simplify your compute shader logic
-3. Check browser developer tools for errors
 
 ## Automated Testing & Capture
 
