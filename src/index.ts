@@ -67,10 +67,10 @@ async function main() {
   ];
 
   const interactions = setupInteractions(device, canvas.context.canvas, textures.size);
-  const canvas_buffers = {
-    [BINDINGS[GROUP_INDEX].BUFFER.CANVAS]: textures.canvas.buffer,
-    [BINDINGS[GROUP_INDEX].BUFFER.CONTROLS]: interactions.controls.buffer,
-    [BINDINGS[GROUP_INDEX].BUFFER.INTERACTIONS]: interactions.interactions.buffer,
+  const buffers = {
+    [BINDINGS[GROUP_INDEX].BUFFER.CANVAS]: {buffer: textures.canvas.buffer, type: "uniform"},
+    [BINDINGS[GROUP_INDEX].BUFFER.CONTROLS]: {buffer: interactions.controls.buffer, type: "uniform"},
+    [BINDINGS[GROUP_INDEX].BUFFER.INTERACTIONS]: {buffer: interactions.interactions.buffer, type: "uniform"},
   };
 
   // overall memory layout
@@ -78,15 +78,15 @@ async function main() {
   const bindGroupLayout = device.createBindGroupLayout({
     label: "bindGroupLayout",
     entries: [
-      ...Object.values(BINDINGS[GROUP_INDEX].BUFFER).map((binding) => ({
-        binding: binding,
-        visibility: visibility,
-        buffer: { type: "uniform" as GPUBufferBindingType },
-      })),
       ...Object.values(BINDINGS[GROUP_INDEX].TEXTURE).map((binding) => ({
         binding: binding,
         visibility: visibility,
         storageTexture: textures.bindingLayout[binding],
+      })),
+      ...Object.values(BINDINGS[GROUP_INDEX].BUFFER).map((binding) => ({
+        binding: binding,
+        visibility: visibility,
+        buffer: { type: buffers[binding].type as GPUBufferBindingType },
       })),
     ],
   });
@@ -101,7 +101,7 @@ async function main() {
       })),
       ...Object.values(BINDINGS[GROUP_INDEX].BUFFER).map((binding) => ({
         binding,
-        resource: { buffer: canvas_buffers[binding] },
+        resource: { buffer: buffers[binding].buffer },
       })),
     ],
   });
@@ -121,18 +121,8 @@ async function main() {
   // traditional render pipeline of vert -> frag
   const render = await createRenderPipeline(device, canvas, pipelineLayout, renderShader, shaderIncludes);
 
-  function frame() {
-
-    // update interaction parameters
-    device.queue.writeBuffer(
-      /*buffer=*/ interactions.interactions.buffer,
-      /*offset=*/ 0,
-      /*data=*/ interactions.interactions.data.buffer
-    );
-
-    const encoder = device.createCommandEncoder();
-
-    // compute pass
+  // compute pass - interesting things happen here
+  function computePass(encoder: GPUCommandEncoder): GPUComputePassEncoder {
     const pass = encoder.beginComputePass();
     pass.setBindGroup(GROUP_INDEX, bindGroup);
 
@@ -140,6 +130,24 @@ async function main() {
     pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT); // in-place state update
 
     pass.end();
+    return pass;
+  }
+
+  // ui interaction to gpu buffer 
+  function updateParameters() {
+    device.queue.writeBuffer( // interaction parameters
+      /*buffer=*/ interactions.interactions.buffer,
+      /*offset=*/ 0,
+      /*data=*/ interactions.interactions.data.buffer
+    );
+  }
+
+  function frame() {
+
+    updateParameters();
+    const encoder = device.createCommandEncoder();
+
+    computePass(encoder);
     renderPass(encoder, canvas, render, bindGroup, GROUP_INDEX);
 
     // submit commands
