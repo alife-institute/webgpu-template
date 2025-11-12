@@ -39,7 +39,8 @@ async function main() {
         INTERACTIONS: 2
       },
       TEXTURE: {
-        STATES: 3
+        STATES: 3,
+        NEIGHBORS: 4
       }
     }
   ];
@@ -53,12 +54,14 @@ async function main() {
     /*size=*/ {
       depthOrArrayLayers: {
         [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: 2,
+        [BINDINGS[GROUP_INDEX].TEXTURE.NEIGHBORS]: 2,
       },
       width: canvas.size.width,
       height: canvas.size.height,
     },
     /*format=*/ {
       [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: "r32uint",
+      [BINDINGS[GROUP_INDEX].TEXTURE.NEIGHBORS]: "r32uint",
     }
   );
 
@@ -72,13 +75,6 @@ async function main() {
   // overall memory layout
   const pipeline = createPipelineLayout(device, BINDINGS[GROUP_INDEX], textures, buffers);
 
-  // compute pipeline
-  const module = await createShader(device, computeShader, shaderIncludes);
-  const computePipeline = device.createComputePipeline({
-    layout: pipeline.layout,
-    compute: { module: module, entryPoint: "compute_main"},
-  });
-
   // traditional render pipeline of vert -> frag
   const render = await createRenderPipeline(device, canvas, pipeline.layout, renderShader, shaderIncludes);
 
@@ -87,13 +83,28 @@ async function main() {
     Math.ceil(textures.size.height / Math.sqrt(WORKGROUP_SIZE)),
   ];
 
+  // compute pipeline
+  const module = await createShader(device, computeShader, shaderIncludes);
+  const countNeighbours = device.createComputePipeline({
+    layout: pipeline.layout,
+    compute: { module: module, entryPoint: "count_neighbors" },
+  });
+
+  const applyRule = device.createComputePipeline({
+    layout: pipeline.layout,
+    compute: { module: module, entryPoint: "apply_rule" },
+  });
+
   // compute pass - interesting things happen here
   function computePass(encoder: GPUCommandEncoder): GPUComputePassEncoder {
     const pass = encoder.beginComputePass();
     pass.setBindGroup(pipeline.index, pipeline.bindGroup);
 
-    pass.setPipeline(computePipeline);
-    pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT); // in-place state update
+    pass.setPipeline(countNeighbours);
+    pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
+
+    pass.setPipeline(applyRule);
+    pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
 
     pass.end();
     return pass;

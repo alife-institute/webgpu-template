@@ -1,1 +1,2 @@
 @group(GROUP_INDEX) @binding(BINDINGS[GROUP_INDEX].TEXTURE.STATES) var states:  texture_storage_2d_array<r32uint, read_write>;
+@group(GROUP_INDEX) @binding(BINDINGS[GROUP_INDEX].TEXTURE.NEIGHBORS) var neighbors:  texture_storage_2d_array<r32uint, read_write>;

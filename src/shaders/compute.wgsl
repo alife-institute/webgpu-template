@@ -2,59 +2,53 @@
 #import includes::textures
 #import includes::interactions
 
-/**
- * Compute Shader - Conway's Game of Life (In-Place Update)
- *
- * NOTE: This uses a single read-write texture for simplicity.
- * For cellular automata with neighbor dependencies, this creates race conditions
- * because cells may read a mix of old and new states. This produces interesting
- * visual artifacts but is not the "correct" Game of Life algorithm.
- *
- * For deterministic cellular automata, use double-buffering (see git history).
- * This pattern works well for simulations without neighbor dependencies.
- */
+@compute @workgroup_size(16, 16)
+fn count_neighbors(@builtin(global_invocation_id) id: vec3<u32>) {
 
-fn countNeighbors(pos: vec2i, layer: i32) -> u32 {
-    let size = vec2i(textureDimensions(states));
-    var count = 0u;
+    let size = canvas.size;
+    let idx = vec2i(id.xy);
 
-    for (var dy = -1; dy <= 1; dy++) {
-        for (var dx = -1; dx <= 1; dx++) {
-            if (dx == 0 && dy == 0) {
-                continue;
-            }
+    for (var layer = 0; layer < 2; layer++) {
+        var count = 0u;
 
-            // Wrap around edges (toroidal topology)
-            let neighbor = vec2i(
-                (pos.x + dx + size.x) % size.x,
-                (pos.y + dy + size.y) % size.y
-            );
+        for (var dy = -1; dy <= 1; dy++) {
+            for (var dx = -1; dx <= 1; dx++) {
+                if (dx == 0 && dy == 0) {
+                    continue;
+                }
 
-            let cell = textureLoad(states, neighbor, layer);
-            if (cell.r > 0u) {
-                count += 1u;
+                // Wrap around edges (toroidal topology)
+                let neighbor = vec2i(
+                    (idx.x + dx + size.x) % size.x,
+                    (idx.y + dy + size.y) % size.y
+                );
+
+                let cell = textureLoad(states, neighbor, layer);
+                if (cell.r > 0u) {
+                    count += 1u;
+                }
             }
         }
+        textureStore(neighbors, idx, layer, vec4u(count, 0u, 0u, 0u));
     }
-
-    return count;
 }
 
 @compute @workgroup_size(16, 16)
-fn compute_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    let pos = vec2i(global_id.xy);
-    let size = vec2i(textureDimensions(states));
+fn apply_rule(@builtin(global_invocation_id) id: vec3<u32>) {
 
-    if (pos.x >= size.x || pos.y >= size.y) {
+    let size = canvas.size;
+    let idx = vec2i(id.xy);
+
+    if (idx.x >= size.x || idx.y >= size.y) {
         return;
     }
 
     // canvas interaction
     var brush = false;
-    let x = vec2<f32>(pos);
+    let x = vec2<f32>(idx);
     let y = interactions.position;
 
-    let dims = vec2<f32>(canvas.size);
+    let dims = vec2<f32>(size);
     let distance = length((x - y) - dims * floor((x - y) / dims + 0.5));
 
     if distance < abs(interactions.size) {
@@ -64,14 +58,14 @@ fn compute_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     for (var layer = 0; layer < 2; layer++) {
 
         if brush {
-            textureStore(states, pos, layer, vec4u(1u, 0u, 0u, 0u));
+            textureStore(states, idx, layer, vec4u(1u, 0u, 0u, 0u));
             continue;
         }
 
-        let currentCell = textureLoad(states, pos, layer);
+        let currentCell = textureLoad(states, idx, layer);
         let isAlive = currentCell.r > 0u;
 
-        let neighbors = countNeighbors(pos, layer);
+        let neighbors = textureLoad(neighbors, idx, layer).r;
 
         // Game of Life rules
         var newState = 0u;
@@ -87,6 +81,6 @@ fn compute_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             }
         }
 
-        textureStore(states, pos, layer, vec4u(newState, 0u, 0u, 0u));
+        textureStore(states, idx, layer, vec4u(newState, 0u, 0u, 0u));
     }
 }
