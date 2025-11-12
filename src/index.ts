@@ -1,10 +1,12 @@
 import {
   configureCanvas,
+  createRenderPipeline,
   createShader,
   random,
+  renderPass,
   requestDevice,
   setupInteractions,
-  setupTextures
+  setupTextures,
 } from "./utils";
 
 import computeShader from "./shaders/compute.wgsl";
@@ -30,8 +32,14 @@ async function main() {
   const GROUP_INDEX = 0;
   const BINDINGS = [{
       GROUP: GROUP_INDEX,
-      BUFFER: { CANVAS: 0, CONTROLS: 1, INTERACTIONS: 2},
-      TEXTURE: { STATES: 3}
+      BUFFER: {
+        CANVAS: 0,
+        CONTROLS: 1,
+        INTERACTIONS: 2
+      },
+      TEXTURE: {
+        STATES: 3
+      }
     }
   ];
 
@@ -111,23 +119,7 @@ async function main() {
   });
 
   // traditional render pipeline of vert -> frag
-  const renderModule = await createShader(device, renderShader, shaderIncludes);
-  const renderPipeline = device.createRenderPipeline({
-    label: "Render Pipeline",
-    layout: pipelineLayout,
-    vertex: {
-      module: renderModule,
-      entryPoint: "vert",
-    },
-    fragment: {
-      module: renderModule,
-      entryPoint: "frag",
-      targets: [{ format: canvas.format }],
-    },
-    primitive: {
-      topology: "triangle-list",
-    },
-  });
+  const render = await createRenderPipeline(device, canvas, pipelineLayout, renderShader, shaderIncludes);
 
   function frame() {
 
@@ -148,22 +140,7 @@ async function main() {
     pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT); // in-place state update
 
     pass.end();
-
-    // render pass
-    const renderPass = encoder.beginRenderPass({
-      colorAttachments: [
-        {
-          view: canvas.context.getCurrentTexture().createView(),
-          loadOp: "load", // load existing content
-          storeOp: "store",
-        },
-      ],
-    });
-    renderPass.setPipeline(renderPipeline);
-    renderPass.setBindGroup(GROUP_INDEX, bindGroup);
-
-    renderPass.draw(6); // draw two triangles for a fullscreen quad
-    renderPass.end();
+    renderPass(encoder, canvas, render, bindGroup, GROUP_INDEX);
 
     // submit commands
     device.queue.submit([encoder.finish()]);

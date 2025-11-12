@@ -327,6 +327,70 @@ export function setupTextures(
   };
 }
 
+export async function createRenderPipeline(
+  device: GPUDevice,
+  canvas: { format: GPUTextureFormat },
+  pipelineLayout: GPUPipelineLayout,
+  shader: string,
+  shaderIncludes: Record<string, string>,
+  label: string = "Render Pipeline",
+  entryPoints: { vertex: string; fragment: string } = { vertex: "vert", fragment: "frag" },
+  topology: GPUPrimitiveTopology = "triangle-list"
+): Promise<{
+  module: GPUShaderModule;
+  pipeline: GPURenderPipeline;
+}> {
+  const module = await createShader(device, shader, shaderIncludes);
+  const pipeline = device.createRenderPipeline({
+    label: label,
+    layout: pipelineLayout,
+    vertex: {
+      module: module,
+      entryPoint: entryPoints.vertex,
+    },
+    fragment: {
+      module: module,
+      entryPoint: entryPoints.fragment,
+      targets: [{ format: canvas.format }],
+    },
+    primitive: {
+      topology: topology,
+    },
+  });
+  return {
+    module: module,
+    pipeline: pipeline,
+  };
+}
+
+export function renderPass(
+  encoder: GPUCommandEncoder,
+  canvas: { context: GPUCanvasContext },
+  render: { pipeline: GPURenderPipeline },
+  bindGroup: GPUBindGroup,
+  GROUP_INDEX: number,
+  vertexCount: number = 6,
+  loadOp: GPULoadOp = "load",
+  storeOp: GPUStoreOp = "store"
+): GPURenderPassEncoder {
+
+  const pass = encoder.beginRenderPass({
+    colorAttachments: [
+      {
+        view: canvas.context.getCurrentTexture().createView(),
+        loadOp: loadOp, // load existing content
+        storeOp: storeOp,
+      },
+    ],
+  });
+  pass.setPipeline(render.pipeline);
+  pass.setBindGroup(GROUP_INDEX, bindGroup);
+
+  pass.draw(vertexCount); // draw two triangles for a fullscreen quad
+  pass.end();
+  return pass;
+}
+
 function channelCount(format: GPUTextureFormat): number {
   if (format.includes("rgba")) {
     return 4;
