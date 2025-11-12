@@ -327,6 +327,68 @@ export function setupTextures(
   };
 }
 
+export function createPipelineLayout(
+  device: GPUDevice,
+  BINDINGS: {
+    GROUP: number;
+    BUFFER: { [key: string]: number };
+    TEXTURE: { [key: string]: number };
+  },
+  textures: {
+    textures: { [key: number]: GPUTexture };
+    bindingLayout: { [key: number]: GPUStorageTextureBindingLayout };
+  },
+  buffers: { [key: number]: { buffer: GPUBuffer; type: GPUBufferBindingType } },
+  visibility:number = GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT
+): {
+  index: number;
+  bindGroup: GPUBindGroup;
+  layout: GPUPipelineLayout;
+} {
+
+  const bindGroupLayout = device.createBindGroupLayout({
+    label: "bindGroupLayout",
+    entries: [
+      ...Object.values(BINDINGS.TEXTURE).map((binding) => ({
+        binding: binding,
+        visibility: visibility,
+        storageTexture: textures.bindingLayout[binding],
+      })),
+      ...Object.values(BINDINGS.BUFFER).map((binding) => ({
+        binding: binding,
+        visibility: visibility,
+        buffer: { type: buffers[binding].type as GPUBufferBindingType },
+      })),
+    ],
+  });
+
+  const bindGroup = device.createBindGroup({
+    label: `Bind Group`,
+    layout: bindGroupLayout,
+    entries: [
+      ...Object.values(BINDINGS.TEXTURE).map((binding) => ({
+        binding,
+        resource: textures.textures[binding].createView(),
+      })),
+      ...Object.values(BINDINGS.BUFFER).map((binding) => ({
+        binding,
+        resource: { buffer: buffers[binding].buffer },
+      })),
+    ],
+  });
+
+  const pipelineLayout = device.createPipelineLayout({
+    label: "pipelineLayout",
+    bindGroupLayouts: [bindGroupLayout],
+  });
+
+  return {
+    index: BINDINGS.GROUP,
+    bindGroup: bindGroup,
+    layout: pipelineLayout,
+  }
+}
+
 export async function createRenderPipeline(
   device: GPUDevice,
   canvas: { format: GPUTextureFormat },
