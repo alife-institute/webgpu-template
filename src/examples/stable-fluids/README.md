@@ -89,12 +89,12 @@ All textures use `texture_storage_2d_array<r32float, read_write>` format due to 
 
 ```bash
 # Build
-npm run build:stable-fluids
+npm run build -- --env example=stable-fluids
 
 # Development server (hot-reload)
-npm run start:stable-fluids
+npm start -- --env example=stable-fluids
 
-# Test with capture tool
+# Test with capture tool (after building)
 npm run capture
 ```
 

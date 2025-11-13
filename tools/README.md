@@ -16,33 +16,8 @@ The tool is already set up in this project. Puppeteer was installed as a dev dep
 
 ## Usage
 
-### Quick Start
-
 ```bash
-# Build the static files
-npm run build
-
-# Capture the simulation (opens visible browser, no server needed)
 npm run capture
-```
-
-### Available Commands
-
-```bash
-# Default: 10 screenshots at 500ms intervals (visible browser)
-npm run capture
-
-# Quick capture: 5 screenshots at 1s intervals
-npm run capture:quick
-
-# Detailed capture: 30 screenshots at 200ms intervals
-npm run capture:detailed
-
-# Custom configuration
-node tools/capture-simulation.js --screenshots 20 --interval 250
-
-# Capture from live dev server instead
-node tools/capture-simulation.js --url http://localhost:5500
 ```
 
 ### Command-Line Options
@@ -62,31 +37,8 @@ node tools/capture-simulation.js --url http://localhost:5500
 **Note**: The default opens `dist/index.html` directly:
 - No dev server needed
 - Visible browser by default (so WebGPU screenshots work)
-- Run `npm run build` first to generate the dist folder
+- Run `npm run build` for a specific example first to generate the dist folder
 - For live dev server testing: use `--url http://localhost:5500`
-
-### Examples
-
-**Capture high-resolution frames:**
-```bash
-node tools/capture-simulation.js --width 1920 --height 1080 --screenshots 20
-```
-
-**Run in headless mode (for CI/CD - console logs only, screenshots will be black):**
-```bash
-node tools/capture-simulation.js --headless true
-```
-
-**Capture from live dev server:**
-```bash
-npm start  # In another terminal
-node tools/capture-simulation.js --url http://localhost:5500
-```
-
-**Capture very fast animation:**
-```bash
-node tools/capture-simulation.js --screenshots 60 --interval 16
-```
 
 ## Output Structure
 
@@ -151,25 +103,7 @@ for size in 512 1024 2048; do
 done
 ```
 
-### 3. Creating Documentation
-
-Capture animation frames for documentation:
-
-```bash
-npm run capture:detailed
-# Use frames to create animated GIFs or tutorial images
-```
-
-### 4. Performance Testing
-
-Monitor console output for performance metrics:
-
-```bash
-node tools/capture-simulation.js --screenshots 100 --interval 100
-jq '.consoleMessages' .capture/session-*/summary.json
-```
-
-### 5. CI/CD Integration
+### 3. CI/CD Integration
 
 Add to your continuous integration pipeline:
 
@@ -248,14 +182,3 @@ ffmpeg -framerate 10 -pattern_type glob -i '.capture/session-*/frame-*.png' \
   -vf "scale=512:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" \
   output.gif
 ```
-
-## Contributing
-
-If you find issues or have suggestions for the capture tool:
-1. Open an issue describing the problem
-2. Include the `summary.json` from your capture session
-3. Attach relevant screenshots or console logs
-
----
-
-Happy capturing! 📸

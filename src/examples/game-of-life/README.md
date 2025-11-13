@@ -65,12 +65,12 @@ uniformBufferData.set([sign * size], 2);
 
 ```bash
 # Build
-npm run build:game-of-life
+npm run build -- --env example=game-of-life
 
 # Development server (hot-reload)
-npm run start:game-of-life
+npm start -- --env example=game-of-life
 
-# Test with capture tool
+# Test with capture tool (after building)
 npm run capture
 ```
 

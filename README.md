@@ -24,28 +24,45 @@ A minimal WebGPU template for creating interactive 2D simulations and computatio
 npm install
 ```
 
-2. **Start the development server**:
+2. **Build an example** (specify which example to build):
 ```bash
-npm start
+npm run build -- --env example=game-of-life
 ```
 
-3. **Open your browser** and navigate to `http://localhost:5500`
+3. **Start the development server**:
+```bash
+npm start -- --env example=game-of-life
+```
 
-   (The dev server serves the built files from `dist/` at the root URL)
+4. **Open your browser** and navigate to `http://localhost:5500`
+
+**Note**: You must specify which example to build.
+Running without `--env example=` will show available examples.
 
 ## Project Structure
 
 ```
 src/
-├── index.ts              # Main application setup
-├── utils.ts              # WebGPU utility functions (includes setupTextures)
+├── utils.ts              # WebGPU utility functions
 ├── assets/               # Static assets (images, etc.)
-└── shaders/
-    ├── compute.wgsl      # Compute shader (simulation logic)
-    ├── render.wgsl       # Render shader (vertex + fragment)
-    └── includes/         # Shared WGSL code (imported via #import)
-        ├── bindings.wgsl # Binding layout definitions
-        └── textures.wgsl # Texture declarations
+└── examples/             # Example simulations
+    ├── game-of-life/     # Conway's Game of Life
+    │   ├── index.ts
+    │   └── shaders/
+    │       ├── compute.wgsl
+    │       ├── render.wgsl
+    │       └── includes/
+    │           ├── bindings.wgsl
+    │           └── textures.wgsl
+    └── stable-fluids/    # Stable Fluids simulation
+    │   ├── index.ts
+    │   └── shaders/
+    │       ├── compute.wgsl
+    │       ├── render.wgsl
+    │       └── includes/
+    │           ├── bindings.wgsl
+    │           └── textures.wgsl
+    └── # other examples
 ```
 
 ## How It Works
@@ -171,7 +188,7 @@ const textures = setupTextures(
   },
   /*format=*/ {
     [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: "r32uint",
-    [BINDINGS[GROUP_INDEX].TEXTURE.VELOCITIES]: "rg32float",  // Specify format
+    [BINDINGS[GROUP_INDEX].TEXTURE.VELOCITIES]: "r32float",  // Specify format
   }
 );
 ```
@@ -246,16 +263,14 @@ The template includes a browser automation tool for capturing console output and
 
 ```bash
 # Build first
-npm run build
+npm run build -- --env example=game-of-life
 
-# Quick capture: 5 screenshots at 1s intervals (visible browser, captures WebGPU!)
-npm run capture:quick
-
-# Standard capture: 10 screenshots at 500ms intervals (visible browser)
+# Standard capture: 10 screenshots at 500ms intervals
 npm run capture
 
-# Detailed capture: 30 screenshots at 200ms intervals (visible browser)
-npm run capture:detailed
+# Custom capture with options
+npm run capture -- --screenshots 5 --interval 1000   # Quick: 5 frames at 1s intervals
+npm run capture -- --screenshots 30 --interval 200   # Detailed: 30 frames at 200ms intervals
 ```
 
 **Note**: The capture tool opens a visible browser by default so WebGPU screenshots work. It opens `dist/index.html` directly - no dev server needed!

@@ -4,14 +4,17 @@
 
 ### Build Process
 
-This project uses Webpack to build TypeScript and WGSL shaders into a static HTML application:
+This project uses Webpack to build TypeScript and WGSL shaders into a static HTML application. You must specify which example to build using the `--env example=` flag:
 
 ```bash
-npm run build                  # Build default example (game-of-life) to dist/
-npm run build:game-of-life     # Build specific example
+npm run build -- --env example=game-of-life      # Build game-of-life to dist/
+npm start -- --env example=game-of-life          # Start dev server for game-of-life
 ```
 
-**Important**: The final output is a **static HTML file** at `dist/index.html`, along with bundled JavaScript.
+**Important**:
+- The `--env example=` flag is **required** - running `npm run build` without it will show an error with available examples
+- The final output is a **static HTML file** at `dist/index.html`, along with bundled JavaScript
+- Webpack automatically discovers all examples in `src/examples/` directory
 
 ### Project Structure
 
@@ -57,62 +60,15 @@ To create a new example simulation:
    - `src/examples/my-simulation/shaders/includes/bindings.wgsl` - Bindings
    - `src/examples/my-simulation/shaders/includes/textures.wgsl` - Textures
 
-3. **Add npm scripts** to `package.json`:
-   ```json
-   "build:my-simulation": "webpack --env example=my-simulation",
-   "start:my-simulation": "webpack serve --port 5500 --env example=my-simulation"
+3. **Build it**:
+   ```bash
+   npm run build -- --env example=my-simulation
    ```
 
-4. **Reference the game-of-life example** as a template for structure and patterns
+**That's it!** Webpack automatically discovers all examples in `src/examples/` - no need to modify `package.json` or any configuration files.
 
-### Available Examples
+**Reference the game-of-life example** as a template for structure and patterns.
 
-#### Game of Life (`game-of-life`)
-
-Conway's Game of Life with interactive two-layer painting and toroidal topology.
-
-**Features**:
-- Two independent simulation layers (cyan and magenta)
-- Interactive brush painting with mouse/touch
-- Two-pass race-condition-free compute algorithm
-- Toroidal edge wrapping
-
-**Build & Run**:
-```bash
-npm run build:game-of-life
-npm run start:game-of-life
-```
-
-**Key Implementation Details**:
-- Uses `texture_2d_array` with 2 layers for dual simulations
-- Two compute kernels: `count_neighbors` and `apply_rule`
-- Brush sign convention: positive for layer 0, negative for layer 1
-- See `src/examples/game-of-life/README.md` for full documentation
-
-#### Stable Fluids (`stable-fluids`)
-
-GPU-accelerated 2D fluid simulation based on Jos Stam's "Stable Fluids" algorithm.
-
-**Features**:
-- Physically-based Navier-Stokes fluid simulation
-- Interactive force and dye injection
-- Rainbow-colored dye based on interaction position
-- Multi-pass projection method for incompressibility
-
-**Build & Run**:
-```bash
-npm run build:stable-fluids
-npm run start:stable-fluids
-```
-
-**Key Implementation Details**:
-- 7 compute passes per frame (advection, diffusion, divergence, pressure solve, projection, dye advection, forces)
-- Semi-Lagrangian advection with bilinear interpolation
-- 20 Jacobi iterations for pressure solving
-- Uses `texture_storage_2d_array<r32float, read_write>` with 2 layers for velocity (x, y components)
-- Single-channel `r32float` format for all textures (velocity, pressure, divergence, dye)
-- Stable force application with singularity prevention at interaction point
-- See `src/examples/stable-fluids/README.md` for full documentation and theory
 
 ## Testing and Validation
 
@@ -121,8 +77,14 @@ npm run start:stable-fluids
 After making code changes, use the capture tool to verify the simulation works:
 
 ```bash
-npm run build
+# Build the example first
+npm run build -- --env example=game-of-life
+
+# Standard capture (10 screenshots at 500ms intervals)
 npm run capture
+
+# Custom capture with explicit arguments
+npm run capture -- --screenshots 5 --interval 1000
 ```
 
 Check `.capture/session-[timestamp]/` for results
@@ -166,6 +128,7 @@ A healthy simulation should show:
 - `Shader compilation failed` - WGSL syntax errors
 - `WebGPU not supported` - Browser compatibility issue
 - `TypeError` - JavaScript errors in your code
+- **Console warnings are actually often critical shader errors**.
 
 ### WebGPU Screenshot and Console Capture
 
@@ -193,14 +156,7 @@ open .capture/session-*/frame-0002.png
 
 ### Development Server
 
-This is typically used by humans for interactive debugging sessions and visualizing hot-reloaded code changes:
-
-```bash
-npm start                      # Start default example (game-of-life) with hot-reload
-npm run start:game-of-life     # Start specific example
-```
-
-**Do NOT run `npm start`** unless explicitly requested - The development server is for human interactive debugging and visualization only. The capture tool provides everything needed for automated validation.
+This is typically used by humans for interactive debugging sessions and visualizing hot-reloaded code changes. **Do NOT run `npm start`** unless explicitly requested - The development server is for human interactive debugging and visualization only. The capture tool provides everything needed for automated validation.
 
 ## Architecture Principles
 
