@@ -31,7 +31,8 @@ async function main() {
 
   // binding indexes matching `shaders/includes/bindings.wgsl`
   const GROUP_INDEX = 0;
-  const BINDINGS = [{
+  const BINDINGS = [
+    {
       GROUP: GROUP_INDEX,
       BUFFER: {
         CANVAS: 0,
@@ -40,9 +41,9 @@ async function main() {
       },
       TEXTURE: {
         STATES: 3,
-        NEIGHBORS: 4
-      }
-    }
+        NEIGHBORS: 4,
+      },
+    },
   ];
 
   const textures = setupTextures(
@@ -50,9 +51,10 @@ async function main() {
     /*bindings=*/ Object.values(BINDINGS[GROUP_INDEX].TEXTURE),
     /*data=*/ {
       [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: arrayFromfunction(
-        (x, y, z) => Math.random() < 0.5 ? 1 : 0,
+        (_x, _y, _z) => (Math.random() < 0.5 ? 1 : 0),
         canvas.size,
-        2),
+        2
+      ),
     },
     /*size=*/ {
       depthOrArrayLayers: {
@@ -70,16 +72,31 @@ async function main() {
 
   const interactions = setupInteractions(device, canvas.context.canvas, textures.size);
   const buffers = {
-    [BINDINGS[GROUP_INDEX].BUFFER.CANVAS]: {buffer: textures.canvas.buffer, type: "uniform" as GPUBufferBindingType},
-    [BINDINGS[GROUP_INDEX].BUFFER.INTERACTIONS]: {buffer: interactions.interactions.buffer, type: "uniform" as GPUBufferBindingType},
-    [BINDINGS[GROUP_INDEX].BUFFER.CONTROLS]: {buffer: interactions.controls.buffer, type: "uniform" as GPUBufferBindingType},
+    [BINDINGS[GROUP_INDEX].BUFFER.CANVAS]: {
+      buffer: textures.canvas.buffer,
+      type: "uniform" as GPUBufferBindingType,
+    },
+    [BINDINGS[GROUP_INDEX].BUFFER.INTERACTIONS]: {
+      buffer: interactions.interactions.buffer,
+      type: "uniform" as GPUBufferBindingType,
+    },
+    [BINDINGS[GROUP_INDEX].BUFFER.CONTROLS]: {
+      buffer: interactions.controls.buffer,
+      type: "uniform" as GPUBufferBindingType,
+    },
   };
 
   // overall memory layout
   const pipeline = createPipelineLayout(device, BINDINGS[GROUP_INDEX], textures, buffers);
 
   // traditional render pipeline of vert -> frag
-  const render = await createRenderPipeline(device, canvas, pipeline.layout, renderShader, shaderIncludes);
+  const render = await createRenderPipeline(
+    device,
+    canvas,
+    pipeline.layout,
+    renderShader,
+    shaderIncludes
+  );
 
   const TEXTURE_WORKGROUP_COUNT: [number, number] = [
     Math.ceil(textures.size.width / Math.sqrt(WORKGROUP_SIZE)),
@@ -113,9 +130,10 @@ async function main() {
     return pass;
   }
 
-  // ui interaction to gpu buffer 
+  // ui interaction to gpu buffer
   function updateParameters() {
-    device.queue.writeBuffer( // interaction parameters
+    device.queue.writeBuffer(
+      // interaction parameters
       /*buffer=*/ interactions.interactions.buffer,
       /*offset=*/ 0,
       /*data=*/ interactions.interactions.data.buffer
@@ -123,7 +141,6 @@ async function main() {
   }
 
   function frame() {
-
     updateParameters();
     const encoder = device.createCommandEncoder();
 

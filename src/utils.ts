@@ -1,7 +1,5 @@
 function throwDetectionError(error: string): never {
-  const errorElement = document.querySelector(
-    ".webgpu-not-supported"
-  ) as HTMLElement;
+  const errorElement = document.querySelector(".webgpu-not-supported") as HTMLElement;
   if (errorElement) {
     errorElement.style.visibility = "visible";
   }
@@ -25,7 +23,7 @@ export async function requestDevice(
   const features = [...requiredFeatures];
 
   const limits = Object.fromEntries(
-    Object.entries(requiredLimits).filter(([key, value]) => value !== undefined)
+    Object.entries(requiredLimits).filter(([_key, value]) => value !== undefined)
   ) as Record<string, number>;
 
   return adapter.requestDevice({
@@ -79,10 +77,7 @@ export async function createShader(
   return module;
 }
 
-function prependIncludes(
-  code: string,
-  includes?: Record<string, string>
-): string {
+function prependIncludes(code: string, includes?: Record<string, string>): string {
   const importRegex = /^#import\s+([a-zA-Z0-9_]+)::([a-zA-Z0-9_]+)/gm;
   const imports = [...code.matchAll(importRegex)];
 
@@ -204,7 +199,7 @@ export function setupInteractions(
     ["mouseup", "touchend"].forEach((type) => {
       canvas.addEventListener(
         type,
-        (event) => {
+        (_event) => {
           uniformBufferData.set([NaN], 2);
         },
         { passive: true }
@@ -269,8 +264,7 @@ export function setupTextures(
       size: {
         width: size.width,
         height: size.height,
-        depthOrArrayLayers:
-          key in depthOrArrayLayers ? depthOrArrayLayers[key] : 1,
+        depthOrArrayLayers: key in depthOrArrayLayers ? depthOrArrayLayers[key] : 1,
       },
     });
   });
@@ -339,13 +333,12 @@ export function createPipelineLayout(
     bindingLayout: { [key: number]: GPUStorageTextureBindingLayout };
   },
   buffers: { [key: number]: { buffer: GPUBuffer; type: GPUBufferBindingType } },
-  visibility:number = GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT
+  visibility: number = GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT
 ): {
   index: number;
   bindGroup: GPUBindGroup;
   layout: GPUPipelineLayout;
 } {
-
   const bindGroupLayout = device.createBindGroupLayout({
     label: "bindGroupLayout",
     entries: [
@@ -386,7 +379,7 @@ export function createPipelineLayout(
     index: BINDINGS.GROUP,
     bindGroup: bindGroup,
     layout: pipelineLayout,
-  }
+  };
 }
 
 export async function createRenderPipeline(
@@ -435,7 +428,6 @@ export function renderPass(
   loadOp: GPULoadOp = "load",
   storeOp: GPUStoreOp = "store"
 ): GPURenderPassEncoder {
-
   const pass = encoder.beginRenderPass({
     colorAttachments: [
       {
@@ -480,10 +472,7 @@ function flatten(nestedArray: number[][][]): number[] {
   return flattened;
 }
 
-function zeros(
-  size: { height: number; width: number },
-  layers: number = 1
-): number[][][] {
+function zeros(size: { height: number; width: number }, layers: number = 1): number[][][] {
   const zeroArray: number[][][] = [];
 
   for (let i = 0; i < size.height; i++) {

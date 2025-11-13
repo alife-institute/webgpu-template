@@ -1,7 +1,25 @@
+# Hidden files (except specific ones)
 .*
 !.gitignore
 !.vscode/
+!.prettierrc.json
+!.prettierignore
 
+# Dependencies
 node_modules/
 
-dist/*
+# Build output
+dist/
+
+# Capture sessions (keep only latest)
+.capture/
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~

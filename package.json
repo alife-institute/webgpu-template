@@ -2,6 +2,7 @@
   "name": "webgpu-template",
   "version": "1.0.0",
   "description": "A template project for WebGPU development using TypeScript and Webpack.",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "webpack serve --port 5500 --env example=game-of-life",
@@ -11,9 +12,13 @@
     "start:game-of-life": "webpack serve --port 5500 --env example=game-of-life",
     "build:stable-fluids": "webpack --env example=stable-fluids",
     "start:stable-fluids": "webpack serve --port 5500 --env example=stable-fluids",
-    "capture": "node tools/capture-simulation.js",
-    "capture:quick": "node tools/capture-simulation.js --screenshots 5 --interval 1000",
-    "capture:detailed": "node tools/capture-simulation.js --screenshots 30 --interval 200"
+    "capture": "node tools/capture-simulation.cjs",
+    "capture:quick": "node tools/capture-simulation.cjs --screenshots 5 --interval 1000",
+    "capture:detailed": "node tools/capture-simulation.cjs --screenshots 30 --interval 200",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{ts,js,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,js,json}\""
   },
   "license": "MIT",
   "dependencies": {
@@ -29,9 +34,12 @@
     "@typescript-eslint/eslint-plugin": "^8.46.4",
     "@typescript-eslint/parser": "^8.46.4",
     "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
     "eslint-webpack-plugin": "^5.0.2",
     "favicons": "^7.2.0",
     "favicons-webpack-plugin": "^6.0.1",
+    "prettier": "^3.6.2",
     "puppeteer": "^24.29.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.4"

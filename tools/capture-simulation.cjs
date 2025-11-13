@@ -23,24 +23,24 @@
  *   --wait <ms>          Wait time before first screenshot (default: 1000)
  */
 
-const puppeteer = require('puppeteer');
-const fs = require('fs');
-const path = require('path');
+const puppeteer = require("puppeteer");
+const fs = require("fs");
+const path = require("path");
 
 // Parse command line arguments
 function parseArgs() {
   // Default to local dist/index.html file
-  const distPath = path.resolve(__dirname, '../dist/index.html');
+  const distPath = path.resolve(__dirname, "../dist/index.html");
   const defaultUrl = `file://${distPath}`;
 
   const args = {
     url: defaultUrl,
     screenshots: 10,
     interval: 500,
-    output: './.capture',
+    output: "./.capture",
     width: 1024,
     height: 768,
-    headless: false,  // Non-headless by default so WebGPU screenshots work
+    headless: false, // Non-headless by default so WebGPU screenshots work
     wait: 1000,
   };
 
@@ -49,40 +49,40 @@ function parseArgs() {
     const next = process.argv[i + 1];
 
     switch (arg) {
-      case '--url':
+      case "--url":
         args.url = next;
         i++;
         break;
-      case '--screenshots':
+      case "--screenshots":
         args.screenshots = parseInt(next);
         i++;
         break;
-      case '--interval':
+      case "--interval":
         args.interval = parseInt(next);
         i++;
         break;
-      case '--output':
+      case "--output":
         args.output = next;
         i++;
         break;
-      case '--width':
+      case "--width":
         args.width = parseInt(next);
         i++;
         break;
-      case '--height':
+      case "--height":
         args.height = parseInt(next);
         i++;
         break;
-      case '--headless':
-        args.headless = next !== 'false';
+      case "--headless":
+        args.headless = next !== "false";
         i++;
         break;
-      case '--wait':
+      case "--wait":
         args.wait = parseInt(next);
         i++;
         break;
-      case '--help':
-      case '-h':
+      case "--help":
+      case "-h":
         console.log(`
 WebGPU Simulation Capture Tool
 
@@ -122,7 +122,7 @@ function ensureOutputDir(dir) {
 
 // Format timestamp for filenames
 function timestamp() {
-  return new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+  return new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
 }
 
 async function captureSimulation() {
@@ -130,15 +130,15 @@ async function captureSimulation() {
   const outputDir = path.resolve(args.output);
   const sessionDir = path.join(outputDir, `session-${timestamp()}`);
 
-  console.log('🚀 WebGPU Simulation Capture Tool\n');
-  console.log('Configuration:');
+  console.log("🚀 WebGPU Simulation Capture Tool\n");
+  console.log("Configuration:");
   console.log(`  URL:         ${args.url}`);
   console.log(`  Screenshots: ${args.screenshots}`);
   console.log(`  Interval:    ${args.interval}ms`);
   console.log(`  Resolution:  ${args.width}x${args.height}`);
   console.log(`  Output:      ${sessionDir}`);
   console.log(`  Headless:    ${args.headless}`);
-  console.log('');
+  console.log("");
 
   // Create output directory
   ensureOutputDir(sessionDir);
@@ -146,14 +146,14 @@ async function captureSimulation() {
   // Store console logs
   const consoleLogs = [];
 
-  console.log('📦 Launching browser...');
+  console.log("📦 Launching browser...");
   const browser = await puppeteer.launch({
     headless: args.headless,
     args: [
-      '--enable-unsafe-webgpu',
-      '--enable-features=Vulkan',
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
+      "--enable-unsafe-webgpu",
+      "--enable-features=Vulkan",
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
     ],
   });
 
@@ -162,7 +162,7 @@ async function captureSimulation() {
     await page.setViewport({ width: args.width, height: args.height });
 
     // Capture console output
-    page.on('console', (msg) => {
+    page.on("console", (msg) => {
       const type = msg.type();
       const text = msg.text();
       const timestamp = new Date().toISOString();
@@ -174,22 +174,23 @@ async function captureSimulation() {
       });
 
       // Print to console with emoji indicators
-      const emoji = {
-        log: '📝',
-        info: 'ℹ️',
-        warn: '⚠️',
-        error: '❌',
-        debug: '🔍',
-      }[type] || '💬';
+      const emoji =
+        {
+          log: "📝",
+          info: "ℹ️",
+          warn: "⚠️",
+          error: "❌",
+          debug: "🔍",
+        }[type] || "💬";
 
       console.log(`${emoji} [${type.toUpperCase()}] ${text}`);
     });
 
     // Capture page errors
-    page.on('pageerror', (error) => {
+    page.on("pageerror", (error) => {
       consoleLogs.push({
         timestamp: new Date().toISOString(),
-        type: 'pageerror',
+        type: "pageerror",
         text: error.toString(),
       });
       console.log(`❌ [PAGE ERROR] ${error.toString()}`);
@@ -199,10 +200,10 @@ async function captureSimulation() {
     console.log(`\n🌐 Navigating to ${args.url}...`);
     try {
       await page.goto(args.url, {
-        waitUntil: 'networkidle0',
+        waitUntil: "networkidle0",
         timeout: 30000,
       });
-      console.log('✅ Page loaded successfully\n');
+      console.log("✅ Page loaded successfully\n");
     } catch (error) {
       console.error(`❌ Failed to load page: ${error.message}`);
       throw error;
@@ -210,39 +211,39 @@ async function captureSimulation() {
 
     // Wait for initial render
     console.log(`⏱️  Waiting ${args.wait}ms for initial render...`);
-    await new Promise(resolve => setTimeout(resolve, args.wait));
+    await new Promise((resolve) => setTimeout(resolve, args.wait));
 
     // Capture screenshots
     console.log(`\n📸 Capturing ${args.screenshots} screenshots...\n`);
     for (let i = 0; i < args.screenshots; i++) {
-      const screenshotPath = path.join(sessionDir, `frame-${String(i).padStart(4, '0')}.png`);
+      const screenshotPath = path.join(sessionDir, `frame-${String(i).padStart(4, "0")}.png`);
       await page.screenshot({ path: screenshotPath });
 
       const progress = Math.round(((i + 1) / args.screenshots) * 100);
-      const bar = '█'.repeat(Math.floor(progress / 2)) + '░'.repeat(50 - Math.floor(progress / 2));
+      const bar = "█".repeat(Math.floor(progress / 2)) + "░".repeat(50 - Math.floor(progress / 2));
       console.log(`  [${bar}] ${progress}% - Frame ${i + 1}/${args.screenshots}`);
 
       if (i < args.screenshots - 1) {
-        await new Promise(resolve => setTimeout(resolve, args.interval));
+        await new Promise((resolve) => setTimeout(resolve, args.interval));
       }
     }
 
-    console.log('\n✅ All screenshots captured!\n');
+    console.log("\n✅ All screenshots captured!\n");
 
     // Save console logs
-    const logPath = path.join(sessionDir, 'console.log');
-    const jsonLogPath = path.join(sessionDir, 'console.json');
+    const logPath = path.join(sessionDir, "console.log");
+    const jsonLogPath = path.join(sessionDir, "console.json");
 
     // Save as text
-    const logText = consoleLogs.map(log =>
-      `[${log.timestamp}] [${log.type.toUpperCase()}] ${log.text}`
-    ).join('\n');
+    const logText = consoleLogs
+      .map((log) => `[${log.timestamp}] [${log.type.toUpperCase()}] ${log.text}`)
+      .join("\n");
     fs.writeFileSync(logPath, logText);
 
     // Save as JSON for programmatic access
     fs.writeFileSync(jsonLogPath, JSON.stringify(consoleLogs, null, 2));
 
-    console.log('📄 Console logs saved:');
+    console.log("📄 Console logs saved:");
     console.log(`  Text: ${logPath}`);
     console.log(`  JSON: ${jsonLogPath}`);
 
@@ -260,14 +261,14 @@ async function captureSimulation() {
           return acc;
         }, {}),
       },
-      errors: consoleLogs.filter(log => log.type === 'error' || log.type === 'pageerror'),
-      warnings: consoleLogs.filter(log => log.type === 'warn'),
+      errors: consoleLogs.filter((log) => log.type === "error" || log.type === "pageerror"),
+      warnings: consoleLogs.filter((log) => log.type === "warn"),
     };
 
-    const summaryPath = path.join(sessionDir, 'summary.json');
+    const summaryPath = path.join(sessionDir, "summary.json");
     fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
 
-    console.log('\n📊 Summary:');
+    console.log("\n📊 Summary:");
     console.log(`  Total console messages: ${summary.consoleMessages.total}`);
     Object.entries(summary.consoleMessages.byType).forEach(([type, count]) => {
       console.log(`    ${type}: ${count}`);
@@ -276,19 +277,18 @@ async function captureSimulation() {
     console.log(`  Warnings: ${summary.warnings.length}`);
 
     if (summary.errors.length > 0) {
-      console.log('\n⚠️  Errors detected:');
-      summary.errors.forEach(err => {
+      console.log("\n⚠️  Errors detected:");
+      summary.errors.forEach((err) => {
         console.log(`  - ${err.text}`);
       });
     }
 
     console.log(`\n✨ All files saved to: ${sessionDir}`);
-
   } catch (error) {
     console.error(`\n❌ Error during capture: ${error.message}`);
     throw error;
   } finally {
-    console.log('\n🔒 Closing browser...');
+    console.log("\n🔒 Closing browser...");
     await browser.close();
   }
 }
@@ -296,10 +296,10 @@ async function captureSimulation() {
 // Run the capture
 captureSimulation()
   .then(() => {
-    console.log('\n✅ Capture completed successfully!\n');
+    console.log("\n✅ Capture completed successfully!\n");
     process.exit(0);
   })
   .catch((error) => {
-    console.error('\n❌ Capture failed:', error);
+    console.error("\n❌ Capture failed:", error);
     process.exit(1);
   });

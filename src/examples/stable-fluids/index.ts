@@ -30,7 +30,8 @@ async function main() {
   const canvas = configureCanvas(device);
 
   const GROUP_INDEX = 0;
-  const BINDINGS = [{
+  const BINDINGS = [
+    {
       GROUP: GROUP_INDEX,
       BUFFER: {
         CANVAS: 0,
@@ -42,30 +43,29 @@ async function main() {
         PRESSURE: 4,
         DIVERGENCE: 5,
         DYE: 6,
-      }
-    }
-  ]; 
+      },
+    },
+  ];
 
   const textureData = setupTextures(
     device,
     Object.values(BINDINGS[GROUP_INDEX].TEXTURE),
     {
       [BINDINGS[GROUP_INDEX].TEXTURE.VELOCITY]: arrayFromfunction(
-        (x, y, z) => { // random initial velocity field
-          return 30*(Math.random() - 0.5)
+        (_x, _y, _z) => {
+          // random initial velocity field
+          return 30 * (Math.random() - 0.5);
         },
         canvas.size,
-        /*layers=*/ 2,
+        /*layers=*/ 2
       ),
-      [BINDINGS[GROUP_INDEX].TEXTURE.DYE]: arrayFromfunction(
-        (x, y) => { // circular dye source in the center
-          const radius = Math.min(canvas.size.width, canvas.size.height) / 10;
-          const dx = x - canvas.size.width / 2;
-          const dy = y - canvas.size.height / 2;
-          return (dx * dx + dy * dy) < (radius * radius) ? 1.0 : 0.0;
-        },
-        canvas.size
-      ),
+      [BINDINGS[GROUP_INDEX].TEXTURE.DYE]: arrayFromfunction((x, y) => {
+        // circular dye source in the center
+        const radius = Math.min(canvas.size.width, canvas.size.height) / 10;
+        const dx = x - canvas.size.width / 2;
+        const dy = y - canvas.size.height / 2;
+        return dx * dx + dy * dy < radius * radius ? 1.0 : 0.0;
+      }, canvas.size),
     },
     {
       depthOrArrayLayers: {
@@ -84,13 +84,28 @@ async function main() {
 
   const interactionData = setupInteractions(device, canvas.context.canvas, textureData.size);
   const buffers = {
-    [BINDINGS[GROUP_INDEX].BUFFER.CANVAS]: {buffer: textureData.canvas.buffer, type: "uniform" as GPUBufferBindingType},
-    [BINDINGS[GROUP_INDEX].BUFFER.INTERACTIONS]: {buffer: interactionData.interactions.buffer, type: "uniform" as GPUBufferBindingType},
-    [BINDINGS[GROUP_INDEX].BUFFER.CONTROLS]: {buffer: interactionData.controls.buffer, type: "uniform" as GPUBufferBindingType},
+    [BINDINGS[GROUP_INDEX].BUFFER.CANVAS]: {
+      buffer: textureData.canvas.buffer,
+      type: "uniform" as GPUBufferBindingType,
+    },
+    [BINDINGS[GROUP_INDEX].BUFFER.INTERACTIONS]: {
+      buffer: interactionData.interactions.buffer,
+      type: "uniform" as GPUBufferBindingType,
+    },
+    [BINDINGS[GROUP_INDEX].BUFFER.CONTROLS]: {
+      buffer: interactionData.controls.buffer,
+      type: "uniform" as GPUBufferBindingType,
+    },
   };
 
   const pipeline = createPipelineLayout(device, BINDINGS[GROUP_INDEX], textureData, buffers);
-  const render = await createRenderPipeline(device, canvas, pipeline.layout, renderShader, shaderIncludes);
+  const render = await createRenderPipeline(
+    device,
+    canvas,
+    pipeline.layout,
+    renderShader,
+    shaderIncludes
+  );
 
   const TEXTURE_WORKGROUP_COUNT: [number, number] = [
     Math.ceil(textureData.size.width / Math.sqrt(WORKGROUP_SIZE)),

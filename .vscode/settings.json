@@ -1,5 +1,15 @@
 {
     "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "explicit"
+    },
+    "eslint.validate": [
+        "javascript",
+        "javascriptreact",
+        "typescript",
+        "typescriptreact"
+    ],
     "typescript.tsdk": "node_modules/typescript/lib",
     "files.exclude": {
         "**/*.js": {
@@ -8,6 +18,6 @@
         "**/**.js": {
             "when": "$(basename).tsx"
         },
-        "**/*.js.map": true,
+        "**/*.js.map": true
     }
 }
