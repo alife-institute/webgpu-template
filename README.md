@@ -8,8 +8,9 @@ A minimal WebGPU template for creating interactive 2D simulations and computatio
 - **Educational**: Well-commented code explaining each step
 - **Hard-coded Quad**: No vertex buffers needed - the vertex shader generates a full-screen quad
 - **Compute Shader Focus**: All interesting logic goes in compute shaders
-- **Example Simulation**: Includes Conway's Game of Life as a starting point
+- **Two Complete Examples**: Conway's Game of Life and Stable Fluids simulation
 - **Easy to Modify**: Clear separation between simulation and rendering
+- **Texture Array Support**: Efficient multi-channel storage using `texture_storage_2d_array`
 
 ## Prerequisites
 

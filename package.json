@@ -4,9 +4,13 @@
   "description": "A template project for WebGPU development using TypeScript and Webpack.",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "webpack serve --port 5500",
-    "watch": "webpack --watch",
-    "build": "webpack",
+    "start": "webpack serve --port 5500 --env example=game-of-life",
+    "watch": "webpack --watch --env example=game-of-life",
+    "build": "webpack --env example=game-of-life",
+    "build:game-of-life": "webpack --env example=game-of-life",
+    "start:game-of-life": "webpack serve --port 5500 --env example=game-of-life",
+    "build:stable-fluids": "webpack --env example=stable-fluids",
+    "start:stable-fluids": "webpack serve --port 5500 --env example=stable-fluids",
     "capture": "node tools/capture-simulation.js",
     "capture:quick": "node tools/capture-simulation.js --screenshots 5 --interval 1000",
     "capture:detailed": "node tools/capture-simulation.js --screenshots 30 --interval 200"

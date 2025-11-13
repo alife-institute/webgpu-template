@@ -1,14 +1,14 @@
 import {
+  arrayFromfunction,
   configureCanvas,
   createPipelineLayout,
   createRenderPipeline,
   createShader,
-  random,
   renderPass,
   requestDevice,
   setupInteractions,
   setupTextures,
-} from "./utils";
+} from "../../utils";
 
 import computeShader from "./shaders/compute.wgsl";
 import renderShader from "./shaders/render.wgsl";
@@ -35,8 +35,8 @@ async function main() {
       GROUP: GROUP_INDEX,
       BUFFER: {
         CANVAS: 0,
-        CONTROLS: 1,
-        INTERACTIONS: 2
+        INTERACTIONS: 1,
+        CONTROLS: 2,
       },
       TEXTURE: {
         STATES: 3,
@@ -49,7 +49,10 @@ async function main() {
     device,
     /*bindings=*/ Object.values(BINDINGS[GROUP_INDEX].TEXTURE),
     /*data=*/ {
-      [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: random(canvas.size.height, canvas.size.width, 2),
+      [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: arrayFromfunction(
+        (x, y, z) => Math.random() < 0.5 ? 1 : 0,
+        canvas.size,
+        2),
     },
     /*size=*/ {
       depthOrArrayLayers: {
@@ -68,8 +71,8 @@ async function main() {
   const interactions = setupInteractions(device, canvas.context.canvas, textures.size);
   const buffers = {
     [BINDINGS[GROUP_INDEX].BUFFER.CANVAS]: {buffer: textures.canvas.buffer, type: "uniform" as GPUBufferBindingType},
-    [BINDINGS[GROUP_INDEX].BUFFER.CONTROLS]: {buffer: interactions.controls.buffer, type: "uniform" as GPUBufferBindingType},
     [BINDINGS[GROUP_INDEX].BUFFER.INTERACTIONS]: {buffer: interactions.interactions.buffer, type: "uniform" as GPUBufferBindingType},
+    [BINDINGS[GROUP_INDEX].BUFFER.CONTROLS]: {buffer: interactions.controls.buffer, type: "uniform" as GPUBufferBindingType},
   };
 
   // overall memory layout

@@ -287,7 +287,7 @@ export function setupTextures(
     const array =
       key in data
         ? new Float32Array(flatten(data[key]))
-        : new Float32Array(flatten(zeros(size.height, size.width, layers)));
+        : new Float32Array(flatten(zeros(size, layers)));
 
     const channels = channelCount(bindingLayout[key].format);
     device.queue.writeTexture(
@@ -481,15 +481,14 @@ function flatten(nestedArray: number[][][]): number[] {
 }
 
 function zeros(
-  height: number,
-  width: number,
+  size: { height: number; width: number },
   layers: number = 1
 ): number[][][] {
   const zeroArray: number[][][] = [];
 
-  for (let i = 0; i < height; i++) {
+  for (let i = 0; i < size.height; i++) {
     const row: number[][] = [];
-    for (let j = 0; j < width; j++) {
+    for (let j = 0; j < size.width; j++) {
       const layer: number[] = [];
       for (let k = 0; k < layers; k++) {
         layer.push(0);
@@ -502,26 +501,26 @@ function zeros(
   return zeroArray;
 }
 
-export function random(
-  height: number,
-  width: number,
+export function arrayFromfunction(
+  func: (x: number, y: number, layer?: number) => number,
+  size: { height: number; width: number },
   layers: number = 1
 ): number[][][] {
-  const randomArray: number[][][] = [];
+  const array: number[][][] = [];
 
-  for (let i = 0; i < height; i++) {
+  for (let i = 0; i < size.height; i++) {
     const row: number[][] = [];
-    for (let j = 0; j < width; j++) {
+    for (let j = 0; j < size.width; j++) {
       const layer: number[] = [];
       for (let k = 0; k < layers; k++) {
-        layer.push(Math.random() > 0.5 ? 1 : 0);
+        layer.push(func(j, i, k));
       }
       row.push(layer);
     }
-    randomArray.push(row);
+    array.push(row);
   }
 
-  return randomArray;
+  return array;
 }
 
 export function getRandomValues(length: number): Uint32Array {
