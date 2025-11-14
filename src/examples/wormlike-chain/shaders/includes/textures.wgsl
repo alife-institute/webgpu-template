@@ -1,0 +1,1 @@
+@group(GROUP_INDEX) @binding(BINDINGS[GROUP_INDEX].TEXTURE.RENDER) var render_texture:  texture_storage_2d_array<r32float, read_write>;
