@@ -1,4 +1,5 @@
 import {
+  addEventListeners,
   arrayFromfunction,
   configureCanvas,
   createPipelineLayout,
@@ -6,9 +7,10 @@ import {
   createShader,
   renderPass,
   requestDevice,
-  setupInteractions,
   setupTextures,
 } from "../../utils";
+
+import { f32, Struct, vec2 } from "../../wgsl";
 
 import computeShader from "./shaders/compute.wgsl";
 import renderShader from "./shaders/render.wgsl";
@@ -37,7 +39,6 @@ async function main() {
       BUFFER: {
         CANVAS: 0,
         INTERACTIONS: 1,
-        CONTROLS: 2,
       },
       TEXTURE: {
         STATES: 3,
@@ -70,18 +71,26 @@ async function main() {
     }
   );
 
-  const interactions = setupInteractions(device, canvas.context.canvas, textures.size);
+  const interactions = new Struct(
+    device,
+    {
+      label: "Interactions",
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    },
+    {
+      position: vec2(f32),
+      size: f32,
+    }
+  );
+
+  addEventListeners(interactions, canvas.context.canvas, textures.size);
   const buffers = {
     [BINDINGS[GROUP_INDEX].BUFFER.CANVAS]: {
       buffer: textures.canvas.buffer,
       type: "uniform" as GPUBufferBindingType,
     },
     [BINDINGS[GROUP_INDEX].BUFFER.INTERACTIONS]: {
-      buffer: interactions.interactions.buffer,
-      type: "uniform" as GPUBufferBindingType,
-    },
-    [BINDINGS[GROUP_INDEX].BUFFER.CONTROLS]: {
-      buffer: interactions.controls.buffer,
+      buffer: interactions._gpubuffer,
       type: "uniform" as GPUBufferBindingType,
     },
   };
@@ -132,12 +141,7 @@ async function main() {
 
   // ui interaction to gpu buffer
   function updateParameters() {
-    device.queue.writeBuffer(
-      // interaction parameters
-      /*buffer=*/ interactions.interactions.buffer,
-      /*offset=*/ 0,
-      /*data=*/ interactions.interactions.data.buffer
-    );
+    interactions.updateBuffer();
   }
 
   function frame() {

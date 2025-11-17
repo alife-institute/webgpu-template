@@ -1,13 +1,14 @@
 import {
+  addEventListeners,
   configureCanvas,
   createPipelineLayout,
   createRenderPipeline,
   createShader,
   renderPass,
   requestDevice,
-  setupInteractions,
   setupTextures,
 } from "../../utils";
+import { f32, Struct, vec2 } from "../../wgsl";
 
 import computeShader from "./shaders/compute.wgsl";
 import renderShader from "./shaders/render.wgsl";
@@ -25,11 +26,8 @@ const shaderIncludes: Record<string, string> = {
 };
 
 // Constants matching shader
-const NUM_CHAINS = 1;
-const NODES_PER_CHAIN = 70;
-const NUM_PASSES = 2; // Graph coloring: alternate updates
 const NODE_SIZE_BYTES = 4 * 8; // u32, u32, f32, f32, u32, u32
-const totalNodes = NUM_CHAINS * NODES_PER_CHAIN;
+const totalNodes = 70;
 
 async function main() {
   const device = await requestDevice();
@@ -43,7 +41,6 @@ async function main() {
       BUFFER: {
         CANVAS: 0,
         INTERACTIONS: 1,
-        CONTROLS: 2,
         NODES: 3,
       },
       TEXTURE: {
@@ -68,8 +65,19 @@ async function main() {
     }
   );
 
-  const interactions = setupInteractions(device, canvas.context.canvas, canvas.size);
+  const interactions = new Struct(
+    device,
+    {
+      label: "Interactions",
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    },
+    {
+      position: vec2(f32),
+      size: f32,
+    }
+  );
 
+  addEventListeners(interactions, canvas.context.canvas, textures.size);
   // Create storage buffer for nodes (empty, will be initialized on GPU)
   const nodesBuffer = device.createBuffer({
     size: totalNodes * NODE_SIZE_BYTES,
@@ -98,13 +106,13 @@ async function main() {
       type: "uniform" as GPUBufferBindingType,
     },
     [BINDINGS[GROUP_INDEX].BUFFER.INTERACTIONS]: {
-      buffer: interactions.interactions.buffer,
+      buffer: interactions._gpubuffer,
       type: "uniform" as GPUBufferBindingType,
     },
-    [BINDINGS[GROUP_INDEX].BUFFER.CONTROLS]: {
-      buffer: interactions.controls.buffer,
-      type: "uniform" as GPUBufferBindingType,
-    },
+    // [BINDINGS[GROUP_INDEX].BUFFER.CONTROLS]: {
+    //   buffer: interactions.controls.buffer,
+    //   type: "uniform" as GPUBufferBindingType,
+    // },
     [BINDINGS[GROUP_INDEX].BUFFER.NODES]: {
       buffer: nodesBuffer,
       type: "storage" as GPUBufferBindingType,
@@ -229,19 +237,9 @@ async function main() {
   }
 
   function updateParameters() {
-    // Update pass_id for graph coloring
-    canvasData[2] = passId;
-    device.queue.writeBuffer(canvasBuffer, 0, canvasData);
-
-    device.queue.writeBuffer(
-      // interaction parameters
-      /*buffer=*/ interactions.interactions.buffer,
-      /*offset=*/ 0,
-      /*data=*/ interactions.interactions.data.buffer
-    );
+    interactions.updateBuffer();
   }
 
-  let passId = 0;
   function frame() {
     updateParameters();
     const encoder = device.createCommandEncoder();
@@ -249,8 +247,6 @@ async function main() {
     computePass();
     renderPass(encoder, canvas, render, pipeline.bindGroup, pipeline.index);
 
-    // submit commands
-    passId = (passId + 1) % NUM_PASSES;
     device.queue.submit([encoder.finish()]);
     requestAnimationFrame(frame);
   }

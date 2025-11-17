@@ -1,3 +1,5 @@
+import { Struct, f32, vec2 } from "./wgsl";
+
 function throwDetectionError(error: string): never {
   const errorElement = document.querySelector(".webgpu-not-supported") as HTMLElement;
   if (errorElement) {
@@ -104,26 +106,24 @@ export function setupInteractions(
   canvas: HTMLCanvasElement | OffscreenCanvas,
   texture: { width: number; height: number },
   size: number = 20
-): {
-  interactions: {
-    data: Float32Array;
-    buffer: GPUBuffer;
-  };
-  controls: {
-    data: ArrayBuffer;
-    buffer: GPUBuffer;
-  };
-  type: GPUBufferBindingType;
-} {
-  const uniformBufferData = new Float32Array(4);
-  const controlsBufferData = new ArrayBuffer(64);
+): Struct {
+  const interactions = new Struct(
+    device,
+    {
+      label: "Interactions",
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    },
+    {
+      position: vec2(f32),
+      size: f32,
+    }
+  );
 
   let sign = 1;
-
   const position = { x: 0, y: 0 };
   const velocity = { x: 0, y: 0 };
 
-  uniformBufferData.set([position.x, position.y]);
+  interactions.position = [position.x, position.y];
   if (canvas instanceof HTMLCanvasElement) {
     canvas.addEventListener("contextmenu", (event) => {
       event.preventDefault();
@@ -153,7 +153,7 @@ export function setupInteractions(
           const x = Math.floor((position.x / rect.width) * texture.width);
           const y = Math.floor((position.y / rect.height) * texture.height);
 
-          uniformBufferData.set([x, y]);
+          interactions.position = [x, y];
         },
         { passive: true }
       );
@@ -172,7 +172,7 @@ export function setupInteractions(
           }
 
           size += velocity.y;
-          uniformBufferData.set([size], 2);
+          interactions.size = size;
         },
         { passive: true }
       );
@@ -191,7 +191,7 @@ export function setupInteractions(
             case event instanceof TouchEvent:
               sign = event.touches.length > 1 ? -1 : 1;
           }
-          uniformBufferData.set([sign * size], 2);
+          interactions.size = sign * size;
         },
         { passive: true }
       );
@@ -200,29 +200,108 @@ export function setupInteractions(
       canvas.addEventListener(
         type,
         (_event) => {
-          uniformBufferData.set([NaN], 2);
+          interactions.size = NaN;
         },
         { passive: true }
       );
     });
   }
-  const uniformBuffer = device.createBuffer({
-    label: "Interaction Buffer",
-    size: uniformBufferData.byteLength,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  });
+  return interactions;
+}
 
-  const controlsBuffer = device.createBuffer({
-    label: "Controls Buffer",
-    size: controlsBufferData.byteLength,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  });
+export function addEventListeners(
+  interactions: Struct,
+  canvas: HTMLCanvasElement | OffscreenCanvas,
+  texture: { width: number; height: number },
+  size: number = 20
+) {
+  let sign = 1;
+  const position = { x: 0, y: 0 };
+  const velocity = { x: 0, y: 0 };
 
-  return {
-    interactions: { data: uniformBufferData, buffer: uniformBuffer },
-    controls: { data: controlsBufferData, buffer: controlsBuffer },
-    type: "uniform",
-  };
+  interactions.position = [position.x, position.y];
+  if (canvas instanceof HTMLCanvasElement) {
+    canvas.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+    });
+
+    ["mousemove", "touchmove"].forEach((type) => {
+      canvas.addEventListener(
+        type,
+        (event) => {
+          const rect = canvas.getBoundingClientRect();
+          let clientX = 0;
+          let clientY = 0;
+
+          if (event instanceof MouseEvent) {
+            clientX = event.clientX;
+            clientY = event.clientY;
+          } else if (event instanceof TouchEvent) {
+            if (event.touches.length === 0) return;
+            clientX = event.touches[0].clientX;
+            clientY = event.touches[0].clientY;
+          }
+
+          position.x = clientX - rect.left;
+          position.y = clientY - rect.top;
+
+          // Scale from CSS pixels to texture coordinates
+          const x = Math.floor((position.x / rect.width) * texture.width);
+          const y = Math.floor((position.y / rect.height) * texture.height);
+
+          interactions.position = [x, y];
+        },
+        { passive: true }
+      );
+    });
+
+    // zoom events TODO(@gszep) add pinch and scroll for touch devices
+    ["wheel"].forEach((type) => {
+      canvas.addEventListener(
+        type,
+        (event) => {
+          switch (true) {
+            case event instanceof WheelEvent:
+              velocity.x = event.deltaY;
+              velocity.y = event.deltaY;
+              break;
+          }
+
+          size += velocity.y;
+          interactions.size = size;
+        },
+        { passive: true }
+      );
+    });
+
+    // click events TODO(@gszep) implement right click equivalent for touch devices
+    ["mousedown", "touchstart"].forEach((type) => {
+      canvas.addEventListener(
+        type,
+        (event) => {
+          switch (true) {
+            case event instanceof MouseEvent:
+              sign = 1 - event.button;
+              break;
+
+            case event instanceof TouchEvent:
+              sign = event.touches.length > 1 ? -1 : 1;
+          }
+          interactions.size = sign * size;
+        },
+        { passive: true }
+      );
+    });
+    ["mouseup", "touchend"].forEach((type) => {
+      canvas.addEventListener(
+        type,
+        (_event) => {
+          interactions.size = NaN;
+        },
+        { passive: true }
+      );
+    });
+  }
 }
 
 export function setupTextures(

@@ -13,7 +13,7 @@ fn line_constraint_updates(@builtin(global_invocation_id) id : vec3u) {
 
 @compute @workgroup_size(256)
 fn curvature_updates(@builtin(global_invocation_id) id : vec3u) {
-  curvature_update(id.x, &nodes, 3.0);
+  curvature_update(id.x, &nodes, 0.0);
 }
 
 const EPS = 1e-37;
@@ -34,7 +34,7 @@ fn line_constraint_update(idx: u32, nodes: ptr<storage, array<Node>, read_write>
   let x = tail.position - node.position;
   let y = head.position - node.position;
 
-  let line_distance = 1.0;
+  let line_distance = 5.0;
 
   nodes[idx].position += 0.5 * ( (length(x) - line_distance) * normalize_safely(x)
                                + (length(y) - line_distance) * normalize_safely(y));
@@ -104,8 +104,6 @@ fn draw(@builtin(global_invocation_id) id: vec3<u32>) {
             textureStore(render_texture, pos, 1, vec4f(f32(pass_id), 0, 0, 0));
         }
     }
-    // textureStore(render_texture, vec2i(position), 0, vec4f(1, 0, 0, 0));
-    // textureStore(render_texture, vec2i(position), 1, vec4f(f32(pass_id), 0, 0, 0));
 }
 
 @compute @workgroup_size(16, 16)
