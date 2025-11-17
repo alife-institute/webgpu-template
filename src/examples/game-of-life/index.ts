@@ -129,34 +129,27 @@ async function main() {
   });
 
   // compute pass - interesting things happen here
-  function computePass(encoder: GPUCommandEncoder): GPUComputePassEncoder {
-    const pass = encoder.beginComputePass();
-    pass.setBindGroup(pipeline.index, pipeline.bindGroup);
+  function computePass() {
+    {
+      const encoder = device.createCommandEncoder();
+      const pass = encoder.beginComputePass();
+      pass.setBindGroup(pipeline.index, pipeline.bindGroup);
 
-    pass.setPipeline(countNeighbours);
-    pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
+      pass.setPipeline(countNeighbours);
+      pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
 
-    pass.setPipeline(applyRule);
-    pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
+      pass.setPipeline(applyRule);
+      pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
 
-    pass.end();
-    return pass;
-  }
-
-  // ui interaction to gpu buffer
-  function updateParameters() {
-    interactions.updateBuffer();
+      pass.end();
+      device.queue.submit([encoder.finish()]);
+    }
   }
 
   function frame() {
-    updateParameters();
-    const encoder = device.createCommandEncoder();
+    computePass();
+    renderPass(device, canvas, render, pipeline.bindGroup, pipeline.index);
 
-    computePass(encoder);
-    renderPass(encoder, canvas, render, pipeline.bindGroup, pipeline.index);
-
-    // submit commands
-    device.queue.submit([encoder.finish()]);
     requestAnimationFrame(frame);
   }
 

@@ -333,6 +333,10 @@ export class Struct {
               dataView.setUint32(componentOffset, value ? 1 : 0, true);
               break;
           }
+
+          // Write the updated component to GPU buffer immediately
+          const componentData = new Uint8Array(this._buffer, componentOffset, baseTypeSize);
+          this.device.queue.writeBuffer(this._gpubuffer, componentOffset, componentData);
         } catch (e) {
           console.error(
             `Error setting field '${fieldName}' (component ${index}) at offset ${componentOffset}: ${e}`
@@ -421,157 +425,6 @@ export class Struct {
   }
 
   public updateBuffer() {
-    this.device.queue.writeBuffer(this._gpubuffer, /*offset=*/ 0, this._buffer);
+    // this.device.queue.writeBuffer(this._gpubuffer, /*offset=*/ 0, this._buffer);
   }
 }
-
-// --- --- ---
-// --- EXAMPLE USAGE ---
-// --- --- ---
-/*
-// Import the builders
-// import { Struct, Wgsl } from './wgsl_struct_builder';
-
-// --- (Example setup: You must have a GPUDevice) ---
-// const adapter = await navigator.gpu.requestAdapter();
-// const device = await adapter.requestDevice();
-// ---
-
-// --- Your example ---
-
-const interactions = new Struct(
-  device,
-  { usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST },
-  {
-    position: Wgsl.vec2(Wgsl.f32), // vec2<f32>: size 8, align 8
-    size: Wgsl.f32,                 // f32: size 4, align 4
-  }
-);
-
-const controls = new Struct(
-  device,
-  { usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST },
-  {
-    parameter: Wgsl.vec2(Wgsl.u32), // vec2<u32>: size 8, align 8
-  }
-);
-
-console.log("--- Interactions Struct ---");
-console.log(`Byte Size: ${interactions.byteSize}`); // 16
-// Layout:
-// field    | align | offset | size
-// ---------------------------------
-// position | 8     | 0      | 8
-// size     | 4     | 8      | 4
-// ---------------------------------
-// total (pre-pad) = 12
-// max align = 8
-// total (padded) = roundUp(8, 12) = 16
-console.log(`Offsets:`, interactions.offsets); // { position: 0, size: 8 }
-console.log(`Buffer Size: ${interactions._buffer.byteLength}`); // 16
-console.log(interactions.getWgslCode('Interactions'));
-// struct Interactions {
-//   position: vec2<f32>,
-//   size: f32,
-// };
-
-// --- NEW MUTATION EXAMPLE ---
-console.log("\n--- Mutation Example ---");
-// Set values
-interactions.size = 42.0;
-interactions.position = [1.0, 2.0];
-
-// Get values back
-console.log(`interactions.size: ${interactions.size}`); // 42
-console.log(`interactions.position: ${interactions.position}`); // 1,2
-
-// Verify the underlying buffer (using a Float32 view)
-const f32View = new Float32Array(interactions._buffer);
-console.log(`Buffer (as f32): ${f32View}`);
-// Expected: [1.0, 2.0, 42.0, 0.0] (position, size, padding)
-// Layout:
-// position: offset 0, size 8 (f32, f32)
-// size:     offset 8, size 4 (f32)
-// padding:  offset 12, size 4
-// total: 16
-// So f32View[0]=1.0, f32View[1]=2.0, f32View[2]=42.0
-
-
-console.log("\n--- Controls Struct ---");
-console.log(`Byte Size: ${controls.byteSize}`); // 8
-console.log(`Offsets:`, controls.offsets); // { parameter: 0 }
-console.log(`Buffer Size: ${controls._buffer.byteLength}`); // 8
-console.log(controls.getWgslCode('Controls'));
-// struct Controls {
-//   parameter: vec2<u32>,
-// };
-
-// --- More Complex Example ---
-
-const sceneUniforms = new Struct(
-  device,
-  { usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST },
-  {
-    worldMatrix: Wgsl.mat4x4(Wgsl.f32),  // size 64, align 16
-    cameraPos: Wgsl.vec3(Wgsl.f32),      // size 12, align 16
-    time: Wgsl.f32,                      // size 4,  align 4
-    lights: Wgsl.array(Wgsl.vec4(Wgsl.f32), 4), // el_size 16, el_align 16. total size 64, align 16
-  }
-);
-
-console.log("\n--- Scene Uniforms Struct ---");
-console.log(`Byte Size: ${sceneUniforms.byteSize}`); // 160
-// Layout:
-// field       | align | offset | size
-// -----------------------------------
-// worldMatrix | 16    | 0      | 64
-// cameraPos   | 16    | 64     | 12
-// time        | 4     | 76     | 4    (offset 76 is multiple of 4)
-// lights      | 16    | 80     | 64   (offset 80 is multiple of 16)
-// -----------------------------------
-// total (pre-pad) = 144
-// max align = 16
-// total (padded) = roundUp(16, 144) = 144
-// ... wait, my manual math is wrong.
-//
-// Let's trace:
-// 1. worldMatrix: align 16. offset = roundUp(16, 0) = 0. next_offset = 0 + 64 = 64. maxAlign = 16.
-// 2. cameraPos:   align 16. offset = roundUp(16, 64) = 64. next_offset = 64 + 12 = 76. maxAlign = 16.
-// 3. time:        align 4.  offset = roundUp(4, 76) = 76. next_offset = 76 + 4 = 80. maxAlign = 16.
-// 4. lights:      align 16. offset = roundUp(16, 80) = 80. next_offset = 80 + 64 = 144. maxAlign = 16.
-//
-// Final size: roundUp(maxAlign, next_offset) = roundUp(16, 144) = 144.
-//
-// Why did my example log 160? Ah, I had a bug in my test `array` function.
-// Let's re-check the `array` function logic.
-// `array<T, N>`
-// Stride = roundUp(align(T), size(T))
-// Size = N * Stride
-// Align = align(T)
-//
-// My `lights` array: T = vec4<f32> (size 16, align 16), N = 4
-// Stride = roundUp(16, 16) = 16.
-// Size = 4 * 16 = 64.
-// Align = 16.
-// This seems correct.
-//
-// Let's re-trace:
-// 1. worldMatrix: align 16. offset 0. next 64. maxAlign 16.
-// 2. cameraPos:   align 16. offset 64. next 76. maxAlign 16.
-// 3. time:        align 4.  offset 76. next 80. maxAlign 16.
-// 4. lights:      align 16. offset 80. next 144. maxAlign 16.
-// Final size = roundUp(16, 144) = 144.
-//
-// The code in the file is correct. My mental math was just wrong in the comment.
-// The output *should* be 144.
-console.log(`Correct Byte Size: ${sceneUniforms.byteSize}`); // 144
-console.log(`Offsets:`, sceneUniforms.offsets); // { worldMatrix: 0, cameraPos: 64, time: 76, lights: 80 }
-console.log(`Buffer Size: ${sceneUniforms._buffer.byteLength}`); // 144
-console.log(sceneUniforms.getWgslCode('SceneUniforms'));
-// struct SceneUniforms {
-//   worldMatrix: mat4x4<f32>,
-//   cameraPos: vec3<f32>,
-//   time: f32,
-//   lights: array<vec4<f32>, 4>,
-// };
-*/

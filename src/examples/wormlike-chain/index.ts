@@ -240,18 +240,10 @@ async function main() {
     }
   }
 
-  function updateParameters() {
-    interactions.updateBuffer();
-  }
-
   function frame() {
-    updateParameters();
-    const encoder = device.createCommandEncoder();
-
     computePass();
-    renderPass(encoder, canvas, render, pipeline.bindGroup, pipeline.index);
+    renderPass(device, canvas, render, pipeline.bindGroup, pipeline.index);
 
-    device.queue.submit([encoder.finish()]);
     requestAnimationFrame(frame);
   }
 

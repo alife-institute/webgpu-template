@@ -1,4 +1,4 @@
-import { Struct, f32, vec2 } from "./wgsl";
+import { Struct } from "./wgsl";
 
 function throwDetectionError(error: string): never {
   const errorElement = document.querySelector(".webgpu-not-supported") as HTMLElement;
@@ -99,114 +99,6 @@ function prependIncludes(code: string, includes?: Record<string, string>): strin
   }
 
   return processedCode;
-}
-
-export function setupInteractions(
-  device: GPUDevice,
-  canvas: HTMLCanvasElement | OffscreenCanvas,
-  texture: { width: number; height: number },
-  size: number = 20
-): Struct {
-  const interactions = new Struct(
-    device,
-    {
-      label: "Interactions",
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    },
-    {
-      position: vec2(f32),
-      size: f32,
-    }
-  );
-
-  let sign = 1;
-  const position = { x: 0, y: 0 };
-  const velocity = { x: 0, y: 0 };
-
-  interactions.position = [position.x, position.y];
-  if (canvas instanceof HTMLCanvasElement) {
-    canvas.addEventListener("contextmenu", (event) => {
-      event.preventDefault();
-    });
-
-    ["mousemove", "touchmove"].forEach((type) => {
-      canvas.addEventListener(
-        type,
-        (event) => {
-          const rect = canvas.getBoundingClientRect();
-          let clientX = 0;
-          let clientY = 0;
-
-          if (event instanceof MouseEvent) {
-            clientX = event.clientX;
-            clientY = event.clientY;
-          } else if (event instanceof TouchEvent) {
-            if (event.touches.length === 0) return;
-            clientX = event.touches[0].clientX;
-            clientY = event.touches[0].clientY;
-          }
-
-          position.x = clientX - rect.left;
-          position.y = clientY - rect.top;
-
-          // Scale from CSS pixels to texture coordinates
-          const x = Math.floor((position.x / rect.width) * texture.width);
-          const y = Math.floor((position.y / rect.height) * texture.height);
-
-          interactions.position = [x, y];
-        },
-        { passive: true }
-      );
-    });
-
-    // zoom events TODO(@gszep) add pinch and scroll for touch devices
-    ["wheel"].forEach((type) => {
-      canvas.addEventListener(
-        type,
-        (event) => {
-          switch (true) {
-            case event instanceof WheelEvent:
-              velocity.x = event.deltaY;
-              velocity.y = event.deltaY;
-              break;
-          }
-
-          size += velocity.y;
-          interactions.size = size;
-        },
-        { passive: true }
-      );
-    });
-
-    // click events TODO(@gszep) implement right click equivalent for touch devices
-    ["mousedown", "touchstart"].forEach((type) => {
-      canvas.addEventListener(
-        type,
-        (event) => {
-          switch (true) {
-            case event instanceof MouseEvent:
-              sign = 1 - event.button;
-              break;
-
-            case event instanceof TouchEvent:
-              sign = event.touches.length > 1 ? -1 : 1;
-          }
-          interactions.size = sign * size;
-        },
-        { passive: true }
-      );
-    });
-    ["mouseup", "touchend"].forEach((type) => {
-      canvas.addEventListener(
-        type,
-        (_event) => {
-          interactions.size = NaN;
-        },
-        { passive: true }
-      );
-    });
-  }
-  return interactions;
 }
 
 export function addEventListeners(
@@ -498,7 +390,7 @@ export async function createRenderPipeline(
 }
 
 export function renderPass(
-  encoder: GPUCommandEncoder,
+  device: GPUDevice,
   canvas: { context: GPUCanvasContext },
   render: { pipeline: GPURenderPipeline },
   bindGroup: GPUBindGroup,
@@ -506,7 +398,8 @@ export function renderPass(
   vertexCount: number = 6,
   loadOp: GPULoadOp = "load",
   storeOp: GPUStoreOp = "store"
-): GPURenderPassEncoder {
+) {
+  const encoder = device.createCommandEncoder();
   const pass = encoder.beginRenderPass({
     colorAttachments: [
       {
@@ -521,7 +414,7 @@ export function renderPass(
 
   pass.draw(vertexCount); // draw two triangles for a fullscreen quad
   pass.end();
-  return pass;
+  device.queue.submit([encoder.finish()]);
 }
 
 function channelCount(format: GPUTextureFormat): number {

@@ -165,49 +165,44 @@ async function main() {
     compute: { module: module, entryPoint: "apply_forces" },
   });
 
-  function computePass(encoder: GPUCommandEncoder): GPUComputePassEncoder {
-    const pass = encoder.beginComputePass();
-    pass.setBindGroup(pipeline.index, pipeline.bindGroup);
+  function computePass() {
+    {
+      const encoder = device.createCommandEncoder();
+      const pass = encoder.beginComputePass();
+      pass.setBindGroup(pipeline.index, pipeline.bindGroup);
 
-    pass.setPipeline(applyForces);
-    pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
-
-    pass.setPipeline(advectVelocity);
-    pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
-
-    pass.setPipeline(diffuseVelocity);
-    pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
-
-    pass.setPipeline(computeDivergence);
-    pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
-
-    for (let i = 0; i < 20; i++) {
-      pass.setPipeline(solvePressure);
+      pass.setPipeline(applyForces);
       pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
+
+      pass.setPipeline(advectVelocity);
+      pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
+
+      pass.setPipeline(diffuseVelocity);
+      pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
+
+      pass.setPipeline(computeDivergence);
+      pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
+
+      for (let i = 0; i < 20; i++) {
+        pass.setPipeline(solvePressure);
+        pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
+      }
+
+      pass.setPipeline(subtractGradient);
+      pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
+
+      pass.setPipeline(advectDye);
+      pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
+
+      pass.end();
+      device.queue.submit([encoder.finish()]);
     }
-
-    pass.setPipeline(subtractGradient);
-    pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
-
-    pass.setPipeline(advectDye);
-    pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
-
-    pass.end();
-    return pass;
-  }
-
-  function updateParameters() {
-    interactions.updateBuffer();
   }
 
   function frame() {
-    updateParameters();
-    const encoder = device.createCommandEncoder();
+    computePass();
+    renderPass(device, canvas, render, pipeline.bindGroup, pipeline.index);
 
-    computePass(encoder);
-    renderPass(encoder, canvas, render, pipeline.bindGroup, pipeline.index);
-
-    device.queue.submit([encoder.finish()]);
     requestAnimationFrame(frame);
   }
 
