@@ -30,7 +30,7 @@ const shaderIncludes: Record<string, string> = {
   interactions: interactions,
 };
 
-const NODE_COUNT = 70;
+const NODE_COUNT = 100;
 const WORKGROUP_SIZE = 256;
 
 async function main() {
@@ -162,19 +162,21 @@ async function main() {
 
   // compute pass - physics simulation
   function computePass() {
-    [0, 1].forEach((passId, _index) => {
-      const encoder = device.createCommandEncoder();
-      const pass = encoder.beginComputePass();
+    for (let i = 0; i < 50; i++) {
+      [0, 1].forEach((passId, _index) => {
+        const encoder = device.createCommandEncoder();
+        const pass = encoder.beginComputePass();
 
-      pass.setBindGroup(pipeline.index, pipeline.bindGroup);
-      pass.setPipeline(line_constraint_updates);
+        pass.setBindGroup(pipeline.index, pipeline.bindGroup);
+        pass.setPipeline(line_constraint_updates);
 
-      canvas.pass_id = passId;
-      pass.dispatchWorkgroups(WORKGROUP_COUNT_BUFFER);
+        canvas.pass_id = passId;
+        pass.dispatchWorkgroups(WORKGROUP_COUNT_BUFFER);
 
-      pass.end();
-      device.queue.submit([encoder.finish()]);
-    });
+        pass.end();
+        device.queue.submit([encoder.finish()]);
+      });
+    }
 
     // Curvature updates
     {
@@ -223,7 +225,7 @@ async function main() {
   gui.add(controls, "line_distance").min(1).max(50).name("Equilibrium Line Distance");
 
   controls.stiffness = 0.0;
-  gui.add(controls, "stiffness").min(0).max(5).step(0.1).name("Bending Stiffness");
+  gui.add(controls, "stiffness").min(0).max(0.02).step(0.01).name("Bending Stiffness");
 
   function frame() {
     computePass();
