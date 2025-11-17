@@ -23,6 +23,14 @@ fn has_connection(node: Node) -> bool {
   return node.tail != node.id || node.head != node.id;
 }
 
+fn has_head(node: Node) -> bool {
+  return node.head != node.id;
+}
+
+fn has_tail(node: Node) -> bool {
+  return node.tail != node.id;
+}
+
 fn has_both_connections(node: Node) -> bool {
   return node.tail != node.id && node.head != node.id;
 }

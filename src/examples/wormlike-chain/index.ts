@@ -222,6 +222,9 @@ async function main() {
   controls.line_distance = 1.0;
   gui.add(controls, "line_distance").min(1).max(50).name("Equilibrium Line Distance");
 
+  controls.stiffness = 0.0;
+  gui.add(controls, "stiffness").min(0).max(5).step(0.1).name("Bending Stiffness");
+
   function frame() {
     computePass();
     renderPass(device, context, render, pipeline.bindGroup, pipeline.index);
