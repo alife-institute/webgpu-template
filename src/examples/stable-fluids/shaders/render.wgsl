@@ -3,7 +3,7 @@
 #import includes::canvas
 
 struct VertexOutput {
-    @builtin(position) position: vec4f,
+    @builtin(position) position: vec4<f32>,
     @location(0) texCoord: vec2<f32>,
 };
 
@@ -21,7 +21,7 @@ fn vert(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
     );
 
     let pos = vertices[vertexIndex];
-    output.position = vec4f(pos, 0.0, 1.0);
+    output.position = vec4<f32>(pos, 0.0, 1.0);
     output.texCoord = pos * 0.5 + 0.5;
     output.texCoord.y = 1.0 - output.texCoord.y;
 
@@ -29,7 +29,7 @@ fn vert(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
 }
 
 @fragment
-fn frag(input: VertexOutput) -> @location(0) vec4f {
+fn frag(input: VertexOutput) -> @location(0) vec4<f32> {
     let texSize = vec2<f32>(textureDimensions(dye));
     let pixelCoord = vec2i(input.texCoord * texSize);
 
@@ -39,5 +39,5 @@ fn frag(input: VertexOutput) -> @location(0) vec4f {
 
     let finalColor = mix(backgroundColor, dyeColor, brightness);
 
-    return vec4f(finalColor, 1.0);
+    return vec4<f32>(finalColor, 1.0);
 }

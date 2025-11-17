@@ -38,7 +38,6 @@ export function configureCanvas(
   device: GPUDevice,
   size = { width: window.innerWidth, height: window.innerHeight }
 ): {
-  canvas: HTMLCanvasElement;
   context: GPUCanvasContext;
   format: GPUTextureFormat;
   size: { width: number; height: number };
@@ -57,7 +56,7 @@ export function configureCanvas(
     alphaMode: "premultiplied",
   });
 
-  return { canvas: canvas, context: context, format: format, size: size };
+  return { context: context, format: format, size: size };
 }
 
 export async function createShader(
@@ -336,7 +335,7 @@ export function createPipelineLayout(
 
 export async function createRenderPipeline(
   device: GPUDevice,
-  canvas: { format: GPUTextureFormat },
+  format: GPUTextureFormat,
   pipelineLayout: GPUPipelineLayout,
   shader: string,
   shaderIncludes: Record<string, string>,
@@ -358,7 +357,7 @@ export async function createRenderPipeline(
     fragment: {
       module: module,
       entryPoint: entryPoints.fragment,
-      targets: [{ format: canvas.format }],
+      targets: [{ format: format }],
     },
     primitive: {
       topology: topology,
@@ -372,7 +371,7 @@ export async function createRenderPipeline(
 
 export function renderPass(
   device: GPUDevice,
-  canvas: { context: GPUCanvasContext },
+  context: GPUCanvasContext,
   render: { pipeline: GPURenderPipeline },
   bindGroup: GPUBindGroup,
   GROUP_INDEX: number,
@@ -384,7 +383,7 @@ export function renderPass(
   const pass = encoder.beginRenderPass({
     colorAttachments: [
       {
-        view: canvas.context.getCurrentTexture().createView(),
+        view: context.getCurrentTexture().createView(),
         loadOp: loadOp, // load existing content
         storeOp: storeOp,
       },

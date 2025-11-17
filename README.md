@@ -245,7 +245,7 @@ Edit the fragment shader in `src/shaders/render.wgsl`:
 
 ```wgsl
 @fragment
-fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
+fn fragment_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let state = textureSample(simulationTexture, texSampler, input.texCoord);
 
     // Change these colors!
@@ -253,7 +253,7 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
     let color2 = vec3f(0.0, 0.0, 1.0);  // Blue
 
     let color = mix(color1, color2, state.r);
-    return vec4f(color, 1.0);
+    return vec4<f32>(color, 1.0);
 }
 ```
 

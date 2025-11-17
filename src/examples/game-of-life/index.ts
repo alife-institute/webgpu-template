@@ -10,7 +10,7 @@ import {
   setupTextures,
 } from "../../utils";
 
-import { Struct } from "../../wgsl";
+import { Struct, bindingsFromWGSL } from "../../wgsl";
 
 import computeShader from "./shaders/compute.wgsl";
 import renderShader from "./shaders/render.wgsl";
@@ -33,23 +33,10 @@ const WORKGROUP_SIZE = 256;
 
 async function main() {
   const device = await requestDevice();
-  const canvas = configureCanvas(device);
+  const { context, format, size } = configureCanvas(device);
 
-  // binding indexes matching `shaders/includes/bindings.wgsl`
   const GROUP_INDEX = 0;
-  const BINDINGS = [
-    {
-      GROUP: GROUP_INDEX,
-      BUFFER: {
-        CANVAS: 0,
-        INTERACTIONS: 1,
-      },
-      TEXTURE: {
-        STATES: 3,
-        NEIGHBORS: 4,
-      },
-    },
-  ];
+  const BINDINGS = bindingsFromWGSL(shaderIncludes.bindings);
 
   const textures = setupTextures(
     device,
@@ -57,7 +44,7 @@ async function main() {
     /*data=*/ {
       [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: arrayFromfunction(
         (_x, _y, _z) => (Math.random() < 0.5 ? 1 : 0),
-        canvas.size,
+        size,
         2
       ),
     },
@@ -66,8 +53,8 @@ async function main() {
         [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: 2,
         [BINDINGS[GROUP_INDEX].TEXTURE.NEIGHBORS]: 2,
       },
-      width: canvas.size.width,
-      height: canvas.size.height,
+      width: size.width,
+      height: size.height,
     },
     /*format=*/ {
       [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: "r32uint",
@@ -75,30 +62,38 @@ async function main() {
     }
   );
 
-  const _canvas = new Struct(shaderIncludes.canvas, device, {
+  const canvas = new Struct(shaderIncludes.canvas, device, {
     label: "Canvas",
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
-
-  _canvas.size = [canvas.size.width, canvas.size.height];
 
   const interactions = new Struct(shaderIncludes.interactions, device, {
     label: "Interactions",
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
 
+  const controls = new Struct(shaderIncludes.controls, device, {
+    label: "Controls",
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+
   const buffers = {
     [BINDINGS[GROUP_INDEX].BUFFER.CANVAS]: {
-      buffer: _canvas._gpubuffer,
+      buffer: canvas._gpubuffer,
       type: "uniform" as GPUBufferBindingType,
     },
     [BINDINGS[GROUP_INDEX].BUFFER.INTERACTIONS]: {
       buffer: interactions._gpubuffer,
       type: "uniform" as GPUBufferBindingType,
     },
+    [BINDINGS[GROUP_INDEX].BUFFER.CONTROLS]: {
+      buffer: controls._gpubuffer,
+      type: "uniform" as GPUBufferBindingType,
+    },
   };
 
-  addEventListeners(interactions, canvas.context.canvas, textures.size);
+  canvas.size = [size.width, size.height];
+  addEventListeners(interactions, context.canvas, textures.size);
 
   // overall memory layout
   const pipeline = createPipelineLayout(device, BINDINGS[GROUP_INDEX], textures, buffers);
@@ -106,7 +101,7 @@ async function main() {
   // traditional render pipeline of vert -> frag
   const render = await createRenderPipeline(
     device,
-    canvas,
+    format,
     pipeline.layout,
     renderShader,
     shaderIncludes
@@ -149,7 +144,7 @@ async function main() {
 
   function frame() {
     computePass();
-    renderPass(device, canvas, render, pipeline.bindGroup, pipeline.index);
+    renderPass(device, context, render, pipeline.bindGroup, pipeline.index);
 
     requestAnimationFrame(frame);
   }

@@ -10,7 +10,7 @@
  */
 
 struct VertexOutput {
-    @builtin(position) position: vec4f,
+    @builtin(position) position: vec4<f32>,
     @location(0) texCoord: vec2<f32>,
 };
 
@@ -32,7 +32,7 @@ fn vert(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
     );
 
     let pos = vertices[vertexIndex];
-    output.position = vec4f(pos, 0.0, 1.0);
+    output.position = vec4<f32>(pos, 0.0, 1.0);
 
     // Convert from clip space (-1 to 1) to texture coordinates (0 to 1)
     output.texCoord = pos * 0.5 + 0.5;
@@ -49,7 +49,7 @@ fn vert(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
  * - Both layers: White (overlap)
  */
 @fragment
-fn frag(input: VertexOutput) -> @location(0) vec4f {
+fn frag(input: VertexOutput) -> @location(0) vec4<f32> {
     let texSize = vec2<f32>(textureDimensions(states));
     let pixelCoord = vec2i(input.texCoord * texSize);
 
@@ -69,5 +69,5 @@ fn frag(input: VertexOutput) -> @location(0) vec4f {
     let hasAnyAlive = layer0Alive + layer1Alive;
     let finalColor = mix(backgroundColor, combinedColor, min(hasAnyAlive, 1.0));
 
-    return vec4f(finalColor, 1.0);
+    return vec4<f32>(finalColor, 1.0);
 }

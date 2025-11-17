@@ -102,14 +102,14 @@ fn draw(@builtin(global_invocation_id) id: vec3<u32>) {
     for (var offset_x: i32 = -2; offset_x <= 2; offset_x += 1) {
         for (var offset_y: i32 = -2; offset_y <= 2; offset_y += 1) {
             let pos = vec2i(position) + vec2<i32>(offset_x, offset_y);
-            textureStore(render_texture, pos, 0, vec4f(1, 0, 0, 0));
-            textureStore(render_texture, pos, 1, vec4f(f32(pass_id), 0, 0, 0));
+            textureStore(render_texture, pos, 0, vec4<f32>(1, 0, 0, 0));
+            textureStore(render_texture, pos, 1, vec4<f32>(f32(pass_id), 0, 0, 0));
         }
     }
 }
 
 @compute @workgroup_size(16, 16)
 fn clear(@builtin(global_invocation_id) id: vec3<u32>) {
-    textureStore(render_texture, id.xy, 0, vec4f(0, 0, 0, 0));
-    textureStore(render_texture, id.xy, 1, vec4f(0, 0, 0, 0));
+    textureStore(render_texture, id.xy, 0, vec4<f32>(0, 0, 0, 0));
+    textureStore(render_texture, id.xy, 1, vec4<f32>(0, 0, 0, 0));
 }

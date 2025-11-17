@@ -8,7 +8,7 @@ import {
   requestDevice,
   setupTextures,
 } from "../../utils";
-import { Struct } from "../../wgsl";
+import { Struct, bindingsFromWGSL } from "../../wgsl";
 
 import computeShader from "./shaders/compute.wgsl";
 import renderShader from "./shaders/render.wgsl";
@@ -29,29 +29,16 @@ const shaderIncludes: Record<string, string> = {
   interactions: interactions,
 };
 
-// Constants matching shader
-const NODE_SIZE_BYTES = 4 * 8; // u32, u32, f32, f32, u32, u32
-const totalNodes = 70;
+const NODE_COUNT = 70;
+const WORKGROUP_SIZE = 256;
 
 async function main() {
   const device = await requestDevice();
-  const canvas = configureCanvas(device);
+  const { context, format, size } = configureCanvas(device);
 
   // binding indexes matching `shaders/includes/bindings.wgsl`
   const GROUP_INDEX = 0;
-  const BINDINGS = [
-    {
-      GROUP: GROUP_INDEX,
-      BUFFER: {
-        CANVAS: 0,
-        INTERACTIONS: 1,
-        NODES: 3,
-      },
-      TEXTURE: {
-        RENDER: 4,
-      },
-    },
-  ];
+  const BINDINGS = bindingsFromWGSL(shaderIncludes.bindings);
 
   const textures = setupTextures(
     device,
@@ -61,67 +48,57 @@ async function main() {
       depthOrArrayLayers: {
         [BINDINGS[GROUP_INDEX].TEXTURE.RENDER]: 4,
       },
-      width: canvas.size.width,
-      height: canvas.size.height,
+      width: size.width,
+      height: size.height,
     },
     /*format=*/ {
       [BINDINGS[GROUP_INDEX].TEXTURE.RENDER]: "r32float",
     }
   );
 
-  const _canvas = new Struct(shaderIncludes.canvas, device, {
+  const canvas = new Struct(shaderIncludes.canvas, device, {
     label: "Canvas",
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
-
-  _canvas.size = [canvas.size.width, canvas.size.height];
 
   const interactions = new Struct(shaderIncludes.interactions, device, {
     label: "Interactions",
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
 
-  addEventListeners(interactions, canvas.context.canvas, textures.size);
-  // Create storage buffer for nodes (empty, will be initialized on GPU)
-  const nodesBuffer = device.createBuffer({
-    size: totalNodes * NODE_SIZE_BYTES,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-
-  // Create canvas uniform buffer with pass_id
-  const canvasBufferSize = 12; // width(u32) + height(u32) + pass_id(u32)
-  const canvasBuffer = device.createBuffer({
-    size: canvasBufferSize,
+  const controls = new Struct(shaderIncludes.controls, device, {
+    label: "Controls",
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
 
-  // Initialize canvas buffer
-  const canvasData = new Uint32Array(
-    new ArrayBuffer(12) // width + height + pass_id
-  );
-  canvasData[0] = canvas.size.width;
-  canvasData[1] = canvas.size.height;
-  canvasData[2] = 0; // initial pass_id
-  device.queue.writeBuffer(canvasBuffer, 0, canvasData);
+  const nodes = new Struct(shaderIncludes.nodes, device, {
+    label: "Nodes",
+    size: NODE_COUNT,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  });
 
   const buffers = {
     [BINDINGS[GROUP_INDEX].BUFFER.CANVAS]: {
-      buffer: _canvas._gpubuffer,
+      buffer: canvas._gpubuffer,
       type: "uniform" as GPUBufferBindingType,
     },
     [BINDINGS[GROUP_INDEX].BUFFER.INTERACTIONS]: {
       buffer: interactions._gpubuffer,
       type: "uniform" as GPUBufferBindingType,
     },
-    // [BINDINGS[GROUP_INDEX].BUFFER.CONTROLS]: {
-    //   buffer: interactions.controls.buffer,
-    //   type: "uniform" as GPUBufferBindingType,
-    // },
+    [BINDINGS[GROUP_INDEX].BUFFER.CONTROLS]: {
+      buffer: controls._gpubuffer,
+      type: "uniform" as GPUBufferBindingType,
+    },
     [BINDINGS[GROUP_INDEX].BUFFER.NODES]: {
-      buffer: nodesBuffer,
+      buffer: nodes._gpubuffer,
       type: "storage" as GPUBufferBindingType,
     },
   };
+
+  canvas.key = [0, 0];
+  canvas.size = [size.width, size.height];
+  addEventListeners(interactions, context.canvas, textures.size);
 
   // overall memory layout
   const pipeline = createPipelineLayout(device, BINDINGS[GROUP_INDEX], textures, buffers);
@@ -129,7 +106,7 @@ async function main() {
   // traditional render pipeline of vert -> frag
   const render = await createRenderPipeline(
     device,
-    canvas,
+    format,
     pipeline.layout,
     renderShader,
     shaderIncludes
@@ -162,13 +139,11 @@ async function main() {
     compute: { module: module, entryPoint: "clear" },
   });
 
-  const workgroupSize = 256;
-  const numWorkgroups = Math.ceil(totalNodes / workgroupSize);
-
-  const numWorkgroupsCanvas = {
-    x: Math.ceil(canvas.size.width / 16),
-    y: Math.ceil(canvas.size.height / 16),
-  };
+  const WORKGROUP_COUNT_BUFFER = Math.ceil(NODE_COUNT / WORKGROUP_SIZE);
+  const WORKGROUP_COUNT_TEXTURE: [number, number] = [
+    Math.ceil(textures.size.width / Math.sqrt(WORKGROUP_SIZE)),
+    Math.ceil(textures.size.height / Math.sqrt(WORKGROUP_SIZE)),
+  ];
 
   function submit_initialization() {
     const encoder = device.createCommandEncoder();
@@ -177,7 +152,7 @@ async function main() {
     pass.setBindGroup(pipeline.index, pipeline.bindGroup);
 
     pass.setPipeline(initialize);
-    pass.dispatchWorkgroups(numWorkgroups);
+    pass.dispatchWorkgroups(WORKGROUP_COUNT_BUFFER);
 
     pass.end();
     device.queue.submit([encoder.finish()]);
@@ -193,8 +168,8 @@ async function main() {
       pass.setBindGroup(pipeline.index, pipeline.bindGroup);
       pass.setPipeline(line_constraint_updates);
 
-      _canvas.pass_id = passId;
-      pass.dispatchWorkgroups(workgroupSize);
+      canvas.pass_id = passId;
+      pass.dispatchWorkgroups(WORKGROUP_COUNT_BUFFER);
 
       pass.end();
       device.queue.submit([encoder.finish()]);
@@ -207,7 +182,7 @@ async function main() {
 
       pass.setBindGroup(pipeline.index, pipeline.bindGroup);
       pass.setPipeline(curvature_updates);
-      pass.dispatchWorkgroups(numWorkgroups);
+      pass.dispatchWorkgroups(WORKGROUP_COUNT_BUFFER);
 
       pass.end();
       device.queue.submit([encoder.finish()]);
@@ -220,7 +195,7 @@ async function main() {
 
       pass.setBindGroup(pipeline.index, pipeline.bindGroup);
       pass.setPipeline(clear);
-      pass.dispatchWorkgroups(numWorkgroupsCanvas.x, numWorkgroupsCanvas.y);
+      pass.dispatchWorkgroups(...WORKGROUP_COUNT_TEXTURE);
 
       pass.end();
       device.queue.submit([encoder.finish()]);
@@ -233,7 +208,7 @@ async function main() {
 
       pass.setBindGroup(pipeline.index, pipeline.bindGroup);
       pass.setPipeline(draw);
-      pass.dispatchWorkgroups(numWorkgroups);
+      pass.dispatchWorkgroups(WORKGROUP_COUNT_BUFFER);
 
       pass.end();
       device.queue.submit([encoder.finish()]);
@@ -242,7 +217,7 @@ async function main() {
 
   function frame() {
     computePass();
-    renderPass(device, canvas, render, pipeline.bindGroup, pipeline.index);
+    renderPass(device, context, render, pipeline.bindGroup, pipeline.index);
 
     requestAnimationFrame(frame);
   }

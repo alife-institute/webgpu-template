@@ -498,3 +498,82 @@ export class Struct {
     throw new Error(`Unsupported WGSL type: ${typeName}`);
   }
 }
+
+/**
+ * Parses WGSL bindings definition code and generates a TypeScript bindings structure.
+ * @param wgslCode WGSL code containing GROUP_INDEX and BINDINGS array definition.
+ * @returns A TypeScript array matching the structure used in examples.
+ */
+export function bindingsFromWGSL(wgslCode: string): Array<{
+  GROUP: number;
+  BUFFER: Record<string, number>;
+  TEXTURE: Record<string, number>;
+}> {
+  const groupIndexMatch = wgslCode.match(/const\s+GROUP_INDEX\s*=\s*(\d+)/);
+  if (!groupIndexMatch) {
+    throw new Error("Could not find GROUP_INDEX constant in WGSL code");
+  }
+  const groupIndex = parseInt(groupIndexMatch[1]);
+
+  const bufferBindingsMatch = wgslCode.match(/BufferBindings\s*\(([^)]+)\)/);
+  if (!bufferBindingsMatch) {
+    throw new Error("Could not find BufferBindings initialization");
+  }
+
+  const textureBindingsMatch = wgslCode.match(/TextureBindings\s*\(([^)]+)\)/);
+  if (!textureBindingsMatch) {
+    throw new Error("Could not find TextureBindings initialization");
+  }
+
+  const bufferStructMatch = wgslCode.match(/struct\s+BufferBindings\s*\{([^}]+)\}/s);
+  if (!bufferStructMatch) {
+    throw new Error("Could not find BufferBindings struct definition");
+  }
+
+  const textureStructMatch = wgslCode.match(/struct\s+TextureBindings\s*\{([^}]+)\}/s);
+  if (!textureStructMatch) {
+    throw new Error("Could not find TextureBindings struct definition");
+  }
+
+  const bufferFields = bufferStructMatch[1]
+    .split(/[,;\n]/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const match = line.match(/^(\w+)\s*:\s*i32/);
+      return match ? match[1] : null;
+    })
+    .filter((name) => name !== null) as string[];
+
+  const textureFields = textureStructMatch[1]
+    .split(/[,;\n]/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const match = line.match(/^(\w+)\s*:\s*i32/);
+      return match ? match[1] : null;
+    })
+    .filter((name) => name !== null) as string[];
+
+  const bufferValues = bufferBindingsMatch[1].split(",").map((v) => parseInt(v.trim()));
+
+  const textureValues = textureBindingsMatch[1].split(",").map((v) => parseInt(v.trim()));
+
+  const BUFFER: Record<string, number> = {};
+  bufferFields.forEach((field, index) => {
+    BUFFER[field] = bufferValues[index];
+  });
+
+  const TEXTURE: Record<string, number> = {};
+  textureFields.forEach((field, index) => {
+    TEXTURE[field] = textureValues[index];
+  });
+
+  return [
+    {
+      GROUP: groupIndex,
+      BUFFER,
+      TEXTURE,
+    },
+  ];
+}
