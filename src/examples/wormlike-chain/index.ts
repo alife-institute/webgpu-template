@@ -8,7 +8,7 @@ import {
   requestDevice,
   setupTextures,
 } from "../../utils";
-import { f32, Struct, vec2 } from "../../wgsl";
+import { Struct } from "../../wgsl";
 
 import computeShader from "./shaders/compute.wgsl";
 import renderShader from "./shaders/render.wgsl";
@@ -69,17 +69,17 @@ async function main() {
     }
   );
 
-  const interactions = new Struct(
-    device,
-    {
-      label: "Interactions",
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    },
-    {
-      position: vec2(f32),
-      size: f32,
-    }
-  );
+  const _canvas = new Struct(shaderIncludes.canvas, device, {
+    label: "Canvas",
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+
+  _canvas.size = [canvas.size.width, canvas.size.height];
+
+  const interactions = new Struct(shaderIncludes.interactions, device, {
+    label: "Interactions",
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
 
   addEventListeners(interactions, canvas.context.canvas, textures.size);
   // Create storage buffer for nodes (empty, will be initialized on GPU)
@@ -106,7 +106,7 @@ async function main() {
 
   const buffers = {
     [BINDINGS[GROUP_INDEX].BUFFER.CANVAS]: {
-      buffer: textures.canvas.buffer,
+      buffer: _canvas._gpubuffer,
       type: "uniform" as GPUBufferBindingType,
     },
     [BINDINGS[GROUP_INDEX].BUFFER.INTERACTIONS]: {
@@ -193,7 +193,7 @@ async function main() {
       pass.setBindGroup(pipeline.index, pipeline.bindGroup);
       pass.setPipeline(line_constraint_updates);
 
-      device.queue.writeBuffer(textures.canvas.buffer, 2 * 4, new Uint32Array([passId]));
+      _canvas.pass_id = passId;
       pass.dispatchWorkgroups(workgroupSize);
 
       pass.end();

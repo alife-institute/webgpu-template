@@ -10,7 +10,7 @@ import {
   setupTextures,
 } from "../../utils";
 
-import { f32, Struct, vec2 } from "../../wgsl";
+import { Struct } from "../../wgsl";
 
 import computeShader from "./shaders/compute.wgsl";
 import renderShader from "./shaders/render.wgsl";
@@ -75,22 +75,21 @@ async function main() {
     }
   );
 
-  const interactions = new Struct(
-    device,
-    {
-      label: "Interactions",
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    },
-    {
-      position: vec2(f32),
-      size: f32,
-    }
-  );
+  const _canvas = new Struct(shaderIncludes.canvas, device, {
+    label: "Canvas",
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
 
-  addEventListeners(interactions, canvas.context.canvas, textures.size);
+  _canvas.size = [canvas.size.width, canvas.size.height];
+
+  const interactions = new Struct(shaderIncludes.interactions, device, {
+    label: "Interactions",
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+
   const buffers = {
     [BINDINGS[GROUP_INDEX].BUFFER.CANVAS]: {
-      buffer: textures.canvas.buffer,
+      buffer: _canvas._gpubuffer,
       type: "uniform" as GPUBufferBindingType,
     },
     [BINDINGS[GROUP_INDEX].BUFFER.INTERACTIONS]: {
@@ -98,6 +97,8 @@ async function main() {
       type: "uniform" as GPUBufferBindingType,
     },
   };
+
+  addEventListeners(interactions, canvas.context.canvas, textures.size);
 
   // overall memory layout
   const pipeline = createPipelineLayout(device, BINDINGS[GROUP_INDEX], textures, buffers);
@@ -111,11 +112,6 @@ async function main() {
     shaderIncludes
   );
 
-  const TEXTURE_WORKGROUP_COUNT: [number, number] = [
-    Math.ceil(textures.size.width / Math.sqrt(WORKGROUP_SIZE)),
-    Math.ceil(textures.size.height / Math.sqrt(WORKGROUP_SIZE)),
-  ];
-
   // compute pipeline
   const module = await createShader(device, computeShader, shaderIncludes);
   const countNeighbours = device.createComputePipeline({
@@ -128,6 +124,11 @@ async function main() {
     compute: { module: module, entryPoint: "apply_rule" },
   });
 
+  const WORKGROUP_COUNT: [number, number] = [
+    Math.ceil(textures.size.width / Math.sqrt(WORKGROUP_SIZE)),
+    Math.ceil(textures.size.height / Math.sqrt(WORKGROUP_SIZE)),
+  ];
+
   // compute pass - interesting things happen here
   function computePass() {
     {
@@ -136,10 +137,10 @@ async function main() {
       pass.setBindGroup(pipeline.index, pipeline.bindGroup);
 
       pass.setPipeline(countNeighbours);
-      pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
+      pass.dispatchWorkgroups(...WORKGROUP_COUNT);
 
       pass.setPipeline(applyRule);
-      pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
+      pass.dispatchWorkgroups(...WORKGROUP_COUNT);
 
       pass.end();
       device.queue.submit([encoder.finish()]);

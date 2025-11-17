@@ -1,5 +1,5 @@
 struct Interactions {
-  position: vec2f,
+  position: vec2<f32>,
   size: f32,
 }
 

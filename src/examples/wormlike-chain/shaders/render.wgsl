@@ -5,7 +5,7 @@
 
 struct VertexOutput {
     @builtin(position) position: vec4f,
-    @location(0) uv: vec2f,
+    @location(0) uv: vec2<f32>,
 }
 
 @vertex
@@ -13,13 +13,13 @@ fn vert(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
     var output: VertexOutput;
 
     // Full-screen quad
-    let vertices = array<vec2f, 6>(
-        vec2f(-1.0, -1.0),
-        vec2f( 1.0, -1.0),
-        vec2f(-1.0,  1.0),
-        vec2f(-1.0,  1.0),
-        vec2f( 1.0, -1.0),
-        vec2f( 1.0,  1.0)
+    let vertices = array<vec2<f32>, 6>(
+        vec2<f32>(-1.0, -1.0),
+        vec2<f32>( 1.0, -1.0),
+        vec2<f32>(-1.0,  1.0),
+        vec2<f32>(-1.0,  1.0),
+        vec2<f32>( 1.0, -1.0),
+        vec2<f32>( 1.0,  1.0)
     );
 
     let pos = vertices[vertexIndex];
@@ -31,7 +31,7 @@ fn vert(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
 }
 
 @fragment
-fn frag(@location(0) uv : vec2f) -> @location(0) vec4f {
+fn frag(@location(0) uv : vec2<f32>) -> @location(0) vec4f {
 
     let x = vec2<i32>(uv * vec2<f32>(canvas.size));
     var color = vec3f(0.05, 0.05, 0.1);

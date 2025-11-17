@@ -245,16 +245,16 @@ export class Struct {
    * Wgsl type descriptors (e.g., `Wgsl.f32`, `Wgsl.vec2(Wgsl.f32)`).
    */
   constructor(
+    code: string,
     device: GPUDevice,
     bufferDescriptor: {
       label?: string;
       size?: GPUSize64;
       usage: GPUBufferUsageFlags;
-    },
-    definition: Record<string, WgslTypeDescriptor>
+    }
   ) {
     this.device = device;
-    this.definition = definition;
+    this.definition = Struct.definitionFromWGSL(code);
 
     let currentOffset = 0;
     let maxAlignment = 0;
@@ -263,10 +263,10 @@ export class Struct {
     // Note: Object.keys order is not guaranteed, but modern JS engines
     // preserve insertion order for non-numeric keys. For guaranteed
     // layout, you might prefer an array of [key, type] tuples.
-    const fields = Object.keys(definition);
+    const fields = Object.keys(this.definition);
 
     for (const fieldName of fields) {
-      const fieldType = definition[fieldName];
+      const fieldType = this.definition[fieldName];
 
       // 1. Update max alignment for the whole struct
       // The struct's alignment is the largest alignment of its members.
@@ -424,7 +424,77 @@ export class Struct {
     return code;
   }
 
-  public updateBuffer() {
-    // this.device.queue.writeBuffer(this._gpubuffer, /*offset=*/ 0, this._buffer);
+  /**
+   * Parses a WGSL struct definition string into a definition object.
+   * @param wgslCode A string containing a WGSL struct definition.
+   * @returns A Record mapping field names to WgslTypeDescriptor objects.
+   */
+  public static definitionFromWGSL(wgslCode: string): Record<string, WgslTypeDescriptor> {
+    const definition: Record<string, WgslTypeDescriptor> = {};
+
+    const structMatch = wgslCode.match(/struct\s+\w+\s*\{([^}]*)\}/s);
+    if (!structMatch) {
+      throw new Error("Invalid WGSL struct definition: could not find struct block");
+    }
+
+    const fieldsBlock = structMatch[1];
+    const fieldLines = fieldsBlock
+      .split(/[,;\n]/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    for (const line of fieldLines) {
+      const fieldMatch = line.match(/^(\w+)\s*:\s*(.+)$/);
+      if (!fieldMatch) continue;
+
+      const [, fieldName, typeName] = fieldMatch;
+      const typeDescriptor = Struct.parseWGSLType(typeName.trim());
+      definition[fieldName] = typeDescriptor;
+    }
+
+    return definition;
+  }
+
+  /**
+   * Helper method to parse WGSL type names into WgslTypeDescriptor objects.
+   * @param typeName The WGSL type name (e.g., "f32", "vec2<f32>", "mat4x4<f32>").
+   * @returns The corresponding WgslTypeDescriptor.
+   */
+  private static parseWGSLType(typeName: string): WgslTypeDescriptor {
+    const scalarTypes: Record<string, WgslTypeDescriptor> = {
+      f32: f32,
+      u32: u32,
+      i32: i32,
+      f16: f16,
+      bool: bool,
+    };
+
+    if (typeName in scalarTypes) {
+      return scalarTypes[typeName];
+    }
+
+    const vecMatch = typeName.match(/^vec([234])<(\w+)>$/);
+    if (vecMatch) {
+      const n = parseInt(vecMatch[1]) as 2 | 3 | 4;
+      const elementType = Struct.parseWGSLType(vecMatch[2]);
+      return vec(n, elementType);
+    }
+
+    const matMatch = typeName.match(/^mat([234])x([234])<(\w+)>$/);
+    if (matMatch) {
+      const c = parseInt(matMatch[1]) as 2 | 3 | 4;
+      const r = parseInt(matMatch[2]) as 2 | 3 | 4;
+      const elementType = Struct.parseWGSLType(matMatch[3]);
+      return mat(c, r, elementType);
+    }
+
+    const arrayMatch = typeName.match(/^array<(.+),\s*(\d+)>$/);
+    if (arrayMatch) {
+      const elementType = Struct.parseWGSLType(arrayMatch[1].trim());
+      const count = parseInt(arrayMatch[2]);
+      return array(elementType, count);
+    }
+
+    throw new Error(`Unsupported WGSL type: ${typeName}`);
   }
 }

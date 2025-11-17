@@ -4,20 +4,20 @@
 
 struct VertexOutput {
     @builtin(position) position: vec4f,
-    @location(0) texCoord: vec2f,
+    @location(0) texCoord: vec2<f32>,
 };
 
 @vertex
 fn vert(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
     var output: VertexOutput;
 
-    let vertices = array<vec2f, 6>(
-        vec2f(-1.0, -1.0),
-        vec2f( 1.0, -1.0),
-        vec2f(-1.0,  1.0),
-        vec2f(-1.0,  1.0),
-        vec2f( 1.0, -1.0),
-        vec2f( 1.0,  1.0)
+    let vertices = array<vec2<f32>, 6>(
+        vec2<f32>(-1.0, -1.0),
+        vec2<f32>( 1.0, -1.0),
+        vec2<f32>(-1.0,  1.0),
+        vec2<f32>(-1.0,  1.0),
+        vec2<f32>( 1.0, -1.0),
+        vec2<f32>( 1.0,  1.0)
     );
 
     let pos = vertices[vertexIndex];
@@ -30,7 +30,7 @@ fn vert(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
 
 @fragment
 fn frag(input: VertexOutput) -> @location(0) vec4f {
-    let texSize = vec2f(textureDimensions(dye));
+    let texSize = vec2<f32>(textureDimensions(dye));
     let pixelCoord = vec2i(input.texCoord * texSize);
 
     let brightness = textureLoad(dye, pixelCoord).x;

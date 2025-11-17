@@ -19,8 +19,8 @@ fn advect_velocity(@builtin(global_invocation_id) id: vec3<u32>) {
 
     let vel_x = textureLoad(velocity, idx, 0).x;
     let vel_y = textureLoad(velocity, idx, 1).x;
-    let vel = vec2f(vel_x, vel_y);
-    let backTrace = vec2f(idx) - vel * DT;
+    let vel = vec2<f32>(vel_x, vel_y);
+    let backTrace = vec2<f32>(idx) - vel * DT;
 
     let x0 = i32(floor(backTrace.x));
     let y0 = i32(floor(backTrace.y));
@@ -134,8 +134,8 @@ fn subtract_gradient(@builtin(global_invocation_id) id: vec3<u32>) {
 
     let vel_x = textureLoad(velocity, idx, 0).x;
     let vel_y = textureLoad(velocity, idx, 1).x;
-    let gradient = vec2f(right - left, up - down) * 0.5;
-    let newVel = vec2f(vel_x, vel_y) - gradient;
+    let gradient = vec2<f32>(right - left, up - down) * 0.5;
+    let newVel = vec2<f32>(vel_x, vel_y) - gradient;
 
     textureStore(velocity, idx, 0, vec4f(newVel.x, 0.0, 0.0, 0.0));
     textureStore(velocity, idx, 1, vec4f(newVel.y, 0.0, 0.0, 0.0));
@@ -152,8 +152,8 @@ fn advect_dye(@builtin(global_invocation_id) id: vec3<u32>) {
 
     let vel_x = textureLoad(velocity, idx, 0).x;
     let vel_y = textureLoad(velocity, idx, 1).x;
-    let vel = vec2f(vel_x, vel_y);
-    let backTrace = vec2f(idx) - vel * DT * 10.0;
+    let vel = vec2<f32>(vel_x, vel_y);
+    let backTrace = vec2<f32>(idx) - vel * DT * 10.0;
 
     let x0 = i32(floor(backTrace.x));
     let y0 = i32(floor(backTrace.y));
@@ -195,7 +195,7 @@ fn apply_forces(@builtin(global_invocation_id) id: vec3<u32>) {
     if distance < abs(interactions.size) {
         let vel_x = textureLoad(velocity, idx, 0).x;
         let vel_y = textureLoad(velocity, idx, 1).x;
-        let vel = vec2f(vel_x, vel_y);
+        let vel = vec2<f32>(vel_x, vel_y);
         let dir = x - interactions.position;
         let dir_length = length(dir);
 

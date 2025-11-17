@@ -207,11 +207,6 @@ export function setupTextures(
   },
   format?: { [key: number]: GPUTextureFormat }
 ): {
-  canvas: {
-    buffer: GPUBuffer;
-    data: Uint32Array;
-    type: GPUBufferBindingType;
-  };
   textures: { [key: number]: GPUTexture };
   bindingLayout: { [key: number]: GPUStorageTextureBindingLayout };
   size: {
@@ -271,21 +266,7 @@ export function setupTextures(
     );
   });
 
-  const canvasData = new Uint32Array([size.width, size.height, 0, 0, 0, 0]);
-  const canvasBuffer = device.createBuffer({
-    label: "Canvas Buffer",
-    size: canvasData.byteLength,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  });
-
-  device.queue.writeBuffer(canvasBuffer, /*offset=*/ 0, /*data=*/ canvasData);
-
   return {
-    canvas: {
-      buffer: canvasBuffer,
-      data: canvasData,
-      type: "uniform",
-    },
     textures: textures,
     bindingLayout: bindingLayout,
     size: size,
@@ -327,7 +308,7 @@ export function createPipelineLayout(
   });
 
   const bindGroup = device.createBindGroup({
-    label: `Bind Group`,
+    label: `bindGroup`,
     layout: bindGroupLayout,
     entries: [
       ...Object.values(BINDINGS.TEXTURE).map((binding) => ({

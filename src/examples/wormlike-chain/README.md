@@ -29,7 +29,7 @@ Each node in the chain contains:
 struct Node {
     id: u32,           // Unique node identifier
     pass_id: u32,      // Graph coloring for parallel updates
-    position: vec2f,   // Current 2D position
+    position: vec2<f32>,   // Current 2D position
     tail: u32,         // ID of previous node in chain (or INVALID_NODE)
     head: u32,         // ID of next node in chain (or INVALID_NODE)
 }
