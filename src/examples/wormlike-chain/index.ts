@@ -1,3 +1,4 @@
+import GUI from "lil-gui";
 import {
   addEventListeners,
   configureCanvas,
@@ -214,6 +215,12 @@ async function main() {
       device.queue.submit([encoder.finish()]);
     }
   }
+
+  const gui = new GUI();
+  gui.add({ reset: () => submit_initialization() }, "reset");
+
+  controls.line_distance = 1.0;
+  gui.add(controls, "line_distance").min(1).max(50).name("Equilibrium Line Distance");
 
   function frame() {
     computePass();

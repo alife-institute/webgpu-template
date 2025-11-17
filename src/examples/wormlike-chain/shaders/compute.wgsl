@@ -36,10 +36,8 @@ fn line_constraint_update(idx: u32, nodes: ptr<storage, array<Node>, read_write>
   let x = tail.position - node.position;
   let y = head.position - node.position;
 
-  let line_distance = 5.0;
-
-  nodes[idx].position += 0.5 * ( (length(x) - line_distance) * normalize_safely(x)
-                               + (length(y) - line_distance) * normalize_safely(y));
+  nodes[idx].position += 0.5 * ( (length(x) - controls.line_distance) * normalize_safely(x)
+                               + (length(y) - controls.line_distance) * normalize_safely(y));
 }
 
 fn biharmonic_operator(idx: u32, nodes: ptr<storage, array<Node>, read_write>) -> vec2<f32> {
@@ -85,10 +83,10 @@ fn initialize_chains(@builtin(global_invocation_id) id : vec3u) {
   nodes[idx].head = (idx + count - 1) % count;
 
   // cut the chain at idx 0
-  if (idx == 0) {
-    nodes[idx].tail = idx;
-    nodes[idx + 1].head = idx + 1;
-  }
+  // if (idx == 0) {
+  //   nodes[idx].tail = idx;
+  //   nodes[idx + 1].head = idx + 1;
+  // }
 }
 
 @compute @workgroup_size(256)
