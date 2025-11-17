@@ -1,6 +1,8 @@
 #import includes::bindings
 #import includes::textures
 #import includes::interactions
+#import includes::canvas
+#import includes::controls
 
 const VISCOSITY = 0.0001;
 const DIFFUSION = 0.0001;

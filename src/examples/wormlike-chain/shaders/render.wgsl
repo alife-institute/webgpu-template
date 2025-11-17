@@ -1,6 +1,7 @@
 #import includes::bindings
 #import includes::textures
 #import includes::interactions
+#import includes::canvas
 
 struct VertexOutput {
     @builtin(position) position: vec4f,

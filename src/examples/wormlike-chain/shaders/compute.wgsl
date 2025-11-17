@@ -2,6 +2,8 @@
 #import includes::nodes
 #import includes::interactions
 #import includes::textures
+#import includes::canvas
+#import includes::controls
 
 const PI = 3.14159265358979323846;
 const dt = 0.1;

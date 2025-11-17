@@ -14,12 +14,16 @@ import computeShader from "./shaders/compute.wgsl";
 import renderShader from "./shaders/render.wgsl";
 
 import bindings from "./shaders/includes/bindings.wgsl";
+import canvas from "./shaders/includes/canvas.wgsl";
+import controls from "./shaders/includes/controls.wgsl";
 import interactions from "./shaders/includes/interactions.wgsl";
 import nodes from "./shaders/includes/nodes.wgsl";
 import textures from "./shaders/includes/textures.wgsl";
 
 const shaderIncludes: Record<string, string> = {
   nodes: nodes,
+  canvas: canvas,
+  controls: controls,
   bindings: bindings,
   textures: textures,
   interactions: interactions,

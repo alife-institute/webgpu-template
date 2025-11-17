@@ -1,5 +1,6 @@
 #import includes::bindings
 #import includes::textures
+#import includes::canvas
 
 /**
  * Render Shader - Displays the simulation on screen
