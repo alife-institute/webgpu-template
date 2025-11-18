@@ -55,11 +55,22 @@ fn biharmonic_operator(idx: u32, nodes: ptr<storage, array<Node>, read_write>) -
 }
 
 fn curvature_update(idx: u32, nodes: ptr<storage, array<Node>, read_write>, stiffness: f32) {
-  if (idx >= arrayLength(nodes)) {
+  let node = nodes[idx];
+  
+  if (node.pass_id != canvas.pass_id || is_disconnected(node) || idx >= arrayLength(nodes)) {
     return;
   }
 
-  nodes[idx].orientation = rotate( nodes[idx].orientation, -stiffness * length(biharmonic_operator(idx, nodes)));
+  let tail = nodes[node.tail];
+  let head = nodes[node.head];
+
+  let equilibrium_angle = textureLoad(parameters_texture, vec2i(node.position), 0).x;
+
+  let tail_torque = angle(tail.orientation, node.orientation) - equilibrium_angle;
+  let head_torque = angle(node.orientation, head.orientation) - equilibrium_angle;
+
+  let net_torque = f32(has_head(node)) * head_torque - f32(has_tail(node)) * tail_torque;
+  nodes[idx].orientation = rotate(nodes[idx].orientation, stiffness * net_torque);
 }
 
 @compute @workgroup_size(256)
@@ -112,12 +123,78 @@ fn draw(@builtin(global_invocation_id) id: vec3<u32>) {
 
 @compute @workgroup_size(16, 16)
 fn clear(@builtin(global_invocation_id) id: vec3<u32>) {
-    if (id.x >= u32(canvas.size.x) || id.y >= u32(canvas.size.y)) {
+    let idx = vec2i(id.xy);
+
+    if (idx.x >= canvas.size.x || idx.y >= canvas.size.y) {
+        return;
+    }
+    
+    textureStore(parameters_texture, idx, 0, 0.9*textureLoad(parameters_texture, idx, 0) );
+
+    textureStore(render_texture, idx, 0, vec4<f32>(0, 0, 0, 0));
+    textureStore(render_texture, idx, 1, vec4<f32>(0, 0, 0, 0));
+}
+
+@compute @workgroup_size(16, 16)
+fn parameters(@builtin(global_invocation_id) id: vec3<u32>) {
+    let idx = vec2i(id.xy);
+    if (idx.x >= canvas.size.x || idx.y >= canvas.size.y) {
         return;
     }
 
-    textureStore(render_texture, id.xy, 0, vec4<f32>(0, 0, 0, 0));
-    textureStore(render_texture, id.xy, 1, vec4<f32>(0, 0, 0, 0));
+    let x = vec2<f32>(idx);
+    let size = vec2<f32>(canvas.size);
+    let distance = length((x - interactions.position) - size * floor((x - interactions.position) / size + 0.5));
+
+    if distance < abs(interactions.size) {
+        textureStore(parameters_texture, idx, 0, vec4f(1, 0, 0, 0));
+    }
+}
+
+@compute @workgroup_size(16, 16)
+fn blur(@builtin(global_invocation_id) id: vec3<u32>) {
+    blur_horizontal(id);
+    blur_vertical(id);
+}
+
+fn blur_horizontal(id: vec3<u32>) {
+    let idx = vec2i(id.xy);
+    if (idx.x >= canvas.size.x || idx.y >= canvas.size.y) {
+        return;
+    }
+
+    let radius = 2;
+    var sum = vec4<f32>(0.0);
+    var weight_sum = 0.0;
+
+    for (var dx = -radius; dx <= radius; dx++) {
+        let sample_x = clamp(idx.x + dx, 0, canvas.size.x - 1);
+        let sample_idx = vec2i(sample_x, idx.y);
+        sum += textureLoad(parameters_texture, sample_idx, 0);
+        weight_sum += 1.0;
+    }
+
+    textureStore(parameters_texture, idx, 1, sum / weight_sum);
+}
+
+fn blur_vertical(id: vec3<u32>) {
+    let idx = vec2i(id.xy);
+    if (idx.x >= canvas.size.x || idx.y >= canvas.size.y) {
+        return;
+    }
+
+    let radius = 2;
+    var sum = vec4<f32>(0.0);
+    var weight_sum = 0.0;
+
+    for (var dy = -radius; dy <= radius; dy++) {
+        let sample_y = clamp(idx.y + dy, 0, canvas.size.y - 1);
+        let sample_idx = vec2i(idx.x, sample_y);
+        sum += textureLoad(parameters_texture, sample_idx, 1);
+        weight_sum += 1.0;
+    }
+
+    textureStore(parameters_texture, idx, 0, sum / weight_sum);
 }
 
 fn perpendicular(v: vec2<f32>) -> vec2<f32> {

@@ -30,7 +30,7 @@ const shaderIncludes: Record<string, string> = {
   interactions: interactions,
 };
 
-const NODE_COUNT = 100;
+const NODE_COUNT = 20;
 const WORKGROUP_SIZE = 256;
 
 async function main() {
@@ -48,6 +48,7 @@ async function main() {
     /*size=*/ {
       depthOrArrayLayers: {
         [BINDINGS[GROUP_INDEX].TEXTURE.RENDER]: 4,
+        [BINDINGS[GROUP_INDEX].TEXTURE.PARAMETERS]: 2,
       },
       width: size.width,
       height: size.height,
@@ -130,6 +131,11 @@ async function main() {
     compute: { module: module, entryPoint: "initialize_chains" },
   });
 
+  const parameters = device.createComputePipeline({
+    layout: pipeline.layout,
+    compute: { module: module, entryPoint: "parameters" },
+  });
+
   const draw = device.createComputePipeline({
     layout: pipeline.layout,
     compute: { module: module, entryPoint: "draw" },
@@ -138,6 +144,11 @@ async function main() {
   const clear = device.createComputePipeline({
     layout: pipeline.layout,
     compute: { module: module, entryPoint: "clear" },
+  });
+
+  const blur = device.createComputePipeline({
+    layout: pipeline.layout,
+    compute: { module: module, entryPoint: "blur" },
   });
 
   const WORKGROUP_COUNT_BUFFER = Math.ceil(NODE_COUNT / WORKGROUP_SIZE);
@@ -162,15 +173,18 @@ async function main() {
 
   // compute pass - physics simulation
   function computePass() {
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < controls.compute_steps; i++) {
       [0, 1].forEach((passId, _index) => {
         const encoder = device.createCommandEncoder();
         const pass = encoder.beginComputePass();
 
         pass.setBindGroup(pipeline.index, pipeline.bindGroup);
-        pass.setPipeline(line_constraint_updates);
-
         canvas.pass_id = passId;
+
+        pass.setPipeline(line_constraint_updates);
+        pass.dispatchWorkgroups(WORKGROUP_COUNT_BUFFER);
+
+        pass.setPipeline(curvature_updates);
         pass.dispatchWorkgroups(WORKGROUP_COUNT_BUFFER);
 
         pass.end();
@@ -178,20 +192,34 @@ async function main() {
       });
     }
 
-    // Curvature updates
+    // Draw interactions to parameter texture
     {
       const encoder = device.createCommandEncoder();
       const pass = encoder.beginComputePass();
 
       pass.setBindGroup(pipeline.index, pipeline.bindGroup);
-      pass.setPipeline(curvature_updates);
-      pass.dispatchWorkgroups(WORKGROUP_COUNT_BUFFER);
+      pass.setPipeline(parameters);
+      pass.dispatchWorkgroups(...WORKGROUP_COUNT_TEXTURE);
 
       pass.end();
       device.queue.submit([encoder.finish()]);
     }
 
-    // Clear render texture
+    // Apply blur to parameter texture
+    {
+      const encoder = device.createCommandEncoder();
+      const pass = encoder.beginComputePass();
+
+      pass.setBindGroup(pipeline.index, pipeline.bindGroup);
+
+      pass.setPipeline(blur);
+      pass.dispatchWorkgroups(...WORKGROUP_COUNT_TEXTURE);
+
+      pass.end();
+      device.queue.submit([encoder.finish()]);
+    }
+
+    // Clear textures
     {
       const encoder = device.createCommandEncoder();
       const pass = encoder.beginComputePass();
@@ -221,11 +249,14 @@ async function main() {
   const gui = new GUI();
   gui.add({ reset: () => submit_initialization() }, "reset");
 
-  controls.line_distance = 1.0;
+  controls.compute_steps = 5;
+  gui.add(controls, "compute_steps").min(1).max(20).step(1).name("Compute Steps");
+
+  controls.line_distance = 20.0;
   gui.add(controls, "line_distance").min(1).max(50).name("Equilibrium Line Distance");
 
-  controls.stiffness = 0.0;
-  gui.add(controls, "stiffness").min(0).max(0.02).step(0.01).name("Bending Stiffness");
+  controls.stiffness = 0.5;
+  gui.add(controls, "stiffness").min(0).max(1.0).step(0.01).name("Bending Stiffness");
 
   function frame() {
     computePass();

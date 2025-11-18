@@ -1,4 +1,5 @@
 struct Controls {
+  compute_steps: u32,
   line_distance: f32,
   stiffness: f32,
 }
