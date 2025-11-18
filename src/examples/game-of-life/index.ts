@@ -1,4 +1,5 @@
 import {
+  addEventListeners,
   arrayFromfunction,
   configureCanvas,
   createPipelineLayout,
@@ -6,18 +7,23 @@ import {
   createShader,
   renderPass,
   requestDevice,
-  setupInteractions,
   setupTextures,
 } from "../../utils";
+
+import { Struct, bindingsFromWGSL } from "../../wgsl";
 
 import computeShader from "./shaders/compute.wgsl";
 import renderShader from "./shaders/render.wgsl";
 
 import bindings from "./shaders/includes/bindings.wgsl";
+import canvas from "./shaders/includes/canvas.wgsl";
+import controls from "./shaders/includes/controls.wgsl";
 import interactions from "./shaders/includes/interactions.wgsl";
 import textures from "./shaders/includes/textures.wgsl";
 
 const shaderIncludes: Record<string, string> = {
+  canvas: canvas,
+  controls: controls,
   bindings: bindings,
   textures: textures,
   interactions: interactions,
@@ -27,24 +33,10 @@ const WORKGROUP_SIZE = 256;
 
 async function main() {
   const device = await requestDevice();
-  const canvas = configureCanvas(device);
+  const { context, format, size } = configureCanvas(device);
 
-  // binding indexes matching `shaders/includes/bindings.wgsl`
   const GROUP_INDEX = 0;
-  const BINDINGS = [
-    {
-      GROUP: GROUP_INDEX,
-      BUFFER: {
-        CANVAS: 0,
-        INTERACTIONS: 1,
-        CONTROLS: 2,
-      },
-      TEXTURE: {
-        STATES: 3,
-        NEIGHBORS: 4,
-      },
-    },
-  ];
+  const BINDINGS = bindingsFromWGSL(shaderIncludes.bindings);
 
   const textures = setupTextures(
     device,
@@ -52,7 +44,7 @@ async function main() {
     /*data=*/ {
       [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: arrayFromfunction(
         (_x, _y, _z) => (Math.random() < 0.5 ? 1 : 0),
-        canvas.size,
+        size,
         2
       ),
     },
@@ -61,8 +53,8 @@ async function main() {
         [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: 2,
         [BINDINGS[GROUP_INDEX].TEXTURE.NEIGHBORS]: 2,
       },
-      width: canvas.size.width,
-      height: canvas.size.height,
+      width: size.width,
+      height: size.height,
     },
     /*format=*/ {
       [BINDINGS[GROUP_INDEX].TEXTURE.STATES]: "r32uint",
@@ -70,21 +62,38 @@ async function main() {
     }
   );
 
-  const interactions = setupInteractions(device, canvas.context.canvas, textures.size);
+  const canvas = new Struct(shaderIncludes.canvas, device, {
+    label: "Canvas",
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+
+  const interactions = new Struct(shaderIncludes.interactions, device, {
+    label: "Interactions",
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+
+  const controls = new Struct(shaderIncludes.controls, device, {
+    label: "Controls",
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+
   const buffers = {
     [BINDINGS[GROUP_INDEX].BUFFER.CANVAS]: {
-      buffer: textures.canvas.buffer,
+      buffer: canvas._gpubuffer,
       type: "uniform" as GPUBufferBindingType,
     },
     [BINDINGS[GROUP_INDEX].BUFFER.INTERACTIONS]: {
-      buffer: interactions.interactions.buffer,
+      buffer: interactions._gpubuffer,
       type: "uniform" as GPUBufferBindingType,
     },
     [BINDINGS[GROUP_INDEX].BUFFER.CONTROLS]: {
-      buffer: interactions.controls.buffer,
+      buffer: controls._gpubuffer,
       type: "uniform" as GPUBufferBindingType,
     },
   };
+
+  canvas.size = [size.width, size.height];
+  addEventListeners(interactions, context.canvas, textures.size);
 
   // overall memory layout
   const pipeline = createPipelineLayout(device, BINDINGS[GROUP_INDEX], textures, buffers);
@@ -92,16 +101,11 @@ async function main() {
   // traditional render pipeline of vert -> frag
   const render = await createRenderPipeline(
     device,
-    canvas,
+    format,
     pipeline.layout,
     renderShader,
     shaderIncludes
   );
-
-  const TEXTURE_WORKGROUP_COUNT: [number, number] = [
-    Math.ceil(textures.size.width / Math.sqrt(WORKGROUP_SIZE)),
-    Math.ceil(textures.size.height / Math.sqrt(WORKGROUP_SIZE)),
-  ];
 
   // compute pipeline
   const module = await createShader(device, computeShader, shaderIncludes);
@@ -115,40 +119,33 @@ async function main() {
     compute: { module: module, entryPoint: "apply_rule" },
   });
 
+  const WORKGROUP_COUNT: [number, number] = [
+    Math.ceil(textures.size.width / Math.sqrt(WORKGROUP_SIZE)),
+    Math.ceil(textures.size.height / Math.sqrt(WORKGROUP_SIZE)),
+  ];
+
   // compute pass - interesting things happen here
-  function computePass(encoder: GPUCommandEncoder): GPUComputePassEncoder {
-    const pass = encoder.beginComputePass();
-    pass.setBindGroup(pipeline.index, pipeline.bindGroup);
+  function computePass() {
+    {
+      const encoder = device.createCommandEncoder();
+      const pass = encoder.beginComputePass();
+      pass.setBindGroup(pipeline.index, pipeline.bindGroup);
 
-    pass.setPipeline(countNeighbours);
-    pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
+      pass.setPipeline(countNeighbours);
+      pass.dispatchWorkgroups(...WORKGROUP_COUNT);
 
-    pass.setPipeline(applyRule);
-    pass.dispatchWorkgroups(...TEXTURE_WORKGROUP_COUNT);
+      pass.setPipeline(applyRule);
+      pass.dispatchWorkgroups(...WORKGROUP_COUNT);
 
-    pass.end();
-    return pass;
-  }
-
-  // ui interaction to gpu buffer
-  function updateParameters() {
-    device.queue.writeBuffer(
-      // interaction parameters
-      /*buffer=*/ interactions.interactions.buffer,
-      /*offset=*/ 0,
-      /*data=*/ interactions.interactions.data.buffer
-    );
+      pass.end();
+      device.queue.submit([encoder.finish()]);
+    }
   }
 
   function frame() {
-    updateParameters();
-    const encoder = device.createCommandEncoder();
+    computePass();
+    renderPass(device, context, render, pipeline.bindGroup, pipeline.index);
 
-    computePass(encoder);
-    renderPass(encoder, canvas, render, pipeline.bindGroup, pipeline.index);
-
-    // submit commands
-    device.queue.submit([encoder.finish()]);
     requestAnimationFrame(frame);
   }
 

@@ -18,6 +18,7 @@
   "dependencies": {
     "@webgpu/types": "^0.1.46",
     "html-webpack-plugin": "^5.6.0",
+    "lil-gui": "^0.21.0",
     "ts-loader": "^9.5.1",
     "webpack": "^5.94.0",
     "webpack-cli": "^5.1.4",

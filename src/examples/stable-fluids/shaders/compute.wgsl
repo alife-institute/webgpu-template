@@ -1,6 +1,8 @@
 #import includes::bindings
 #import includes::textures
 #import includes::interactions
+#import includes::canvas
+#import includes::controls
 
 const VISCOSITY = 0.0001;
 const DIFFUSION = 0.0001;
@@ -17,8 +19,8 @@ fn advect_velocity(@builtin(global_invocation_id) id: vec3<u32>) {
 
     let vel_x = textureLoad(velocity, idx, 0).x;
     let vel_y = textureLoad(velocity, idx, 1).x;
-    let vel = vec2f(vel_x, vel_y);
-    let backTrace = vec2f(idx) - vel * DT;
+    let vel = vec2<f32>(vel_x, vel_y);
+    let backTrace = vec2<f32>(idx) - vel * DT;
 
     let x0 = i32(floor(backTrace.x));
     let y0 = i32(floor(backTrace.y));
@@ -46,8 +48,8 @@ fn advect_velocity(@builtin(global_invocation_id) id: vec3<u32>) {
     let bottomY = mix(vy01, vy11, sx);
     let newVelY = mix(topY, bottomY, sy);
 
-    textureStore(velocity, idx, 0, vec4f(newVelX, 0.0, 0.0, 0.0));
-    textureStore(velocity, idx, 1, vec4f(newVelY, 0.0, 0.0, 0.0));
+    textureStore(velocity, idx, 0, vec4<f32>(newVelX, 0.0, 0.0, 0.0));
+    textureStore(velocity, idx, 1, vec4<f32>(newVelY, 0.0, 0.0, 0.0));
 }
 
 @compute @workgroup_size(16, 16)
@@ -75,8 +77,8 @@ fn diffuse_velocity(@builtin(global_invocation_id) id: vec3<u32>) {
     let newVelX = (centerX + a * (leftX + rightX + downX + upX)) / (1.0 + 4.0 * a);
     let newVelY = (centerY + a * (leftY + rightY + downY + upY)) / (1.0 + 4.0 * a);
 
-    textureStore(velocity, idx, 0, vec4f(newVelX, 0.0, 0.0, 0.0));
-    textureStore(velocity, idx, 1, vec4f(newVelY, 0.0, 0.0, 0.0));
+    textureStore(velocity, idx, 0, vec4<f32>(newVelX, 0.0, 0.0, 0.0));
+    textureStore(velocity, idx, 1, vec4<f32>(newVelY, 0.0, 0.0, 0.0));
 }
 
 @compute @workgroup_size(16, 16)
@@ -94,7 +96,7 @@ fn compute_divergence(@builtin(global_invocation_id) id: vec3<u32>) {
     let up = textureLoad(velocity, vec2i(idx.x, (idx.y + 1) % size.y), 1).x;
 
     let div = 0.5 * ((right - left) + (up - down));
-    textureStore(divergence, idx, vec4f(div, 0.0, 0.0, 0.0));
+    textureStore(divergence, idx, vec4<f32>(div, 0.0, 0.0, 0.0));
 }
 
 @compute @workgroup_size(16, 16)
@@ -113,7 +115,7 @@ fn solve_pressure(@builtin(global_invocation_id) id: vec3<u32>) {
     let div = textureLoad(divergence, idx).x;
 
     let newPressure = (left + right + down + up - div) * 0.25;
-    textureStore(pressure, idx, vec4f(newPressure, 0.0, 0.0, 0.0));
+    textureStore(pressure, idx, vec4<f32>(newPressure, 0.0, 0.0, 0.0));
 }
 
 @compute @workgroup_size(16, 16)
@@ -132,11 +134,11 @@ fn subtract_gradient(@builtin(global_invocation_id) id: vec3<u32>) {
 
     let vel_x = textureLoad(velocity, idx, 0).x;
     let vel_y = textureLoad(velocity, idx, 1).x;
-    let gradient = vec2f(right - left, up - down) * 0.5;
-    let newVel = vec2f(vel_x, vel_y) - gradient;
+    let gradient = vec2<f32>(right - left, up - down) * 0.5;
+    let newVel = vec2<f32>(vel_x, vel_y) - gradient;
 
-    textureStore(velocity, idx, 0, vec4f(newVel.x, 0.0, 0.0, 0.0));
-    textureStore(velocity, idx, 1, vec4f(newVel.y, 0.0, 0.0, 0.0));
+    textureStore(velocity, idx, 0, vec4<f32>(newVel.x, 0.0, 0.0, 0.0));
+    textureStore(velocity, idx, 1, vec4<f32>(newVel.y, 0.0, 0.0, 0.0));
 }
 
 @compute @workgroup_size(16, 16)
@@ -150,8 +152,8 @@ fn advect_dye(@builtin(global_invocation_id) id: vec3<u32>) {
 
     let vel_x = textureLoad(velocity, idx, 0).x;
     let vel_y = textureLoad(velocity, idx, 1).x;
-    let vel = vec2f(vel_x, vel_y);
-    let backTrace = vec2f(idx) - vel * DT * 10.0;
+    let vel = vec2<f32>(vel_x, vel_y);
+    let backTrace = vec2<f32>(idx) - vel * DT * 10.0;
 
     let x0 = i32(floor(backTrace.x));
     let y0 = i32(floor(backTrace.y));
@@ -170,7 +172,7 @@ fn advect_dye(@builtin(global_invocation_id) id: vec3<u32>) {
     let bottom = mix(d01, d11, sx);
     let newDye = mix(top, bottom, sy);
 
-    textureStore(dye, idx, vec4f(newDye, 0.0, 0.0, 0.0));
+    textureStore(dye, idx, vec4<f32>(newDye, 0.0, 0.0, 0.0));
 }
 
 @compute @workgroup_size(16, 16)
@@ -193,21 +195,21 @@ fn apply_forces(@builtin(global_invocation_id) id: vec3<u32>) {
     if distance < abs(interactions.size) {
         let vel_x = textureLoad(velocity, idx, 0).x;
         let vel_y = textureLoad(velocity, idx, 1).x;
-        let vel = vec2f(vel_x, vel_y);
+        let vel = vec2<f32>(vel_x, vel_y);
         let dir = x - interactions.position;
         let dir_length = length(dir);
 
         if dir_length > 0.1 {
             let force = (dir / dir_length) * sign(interactions.size) * 5.0;
             let newVel = vel + force;
-            textureStore(velocity, idx, 0, vec4f(newVel.x, 0.0, 0.0, 0.0));
-            textureStore(velocity, idx, 1, vec4f(newVel.y, 0.0, 0.0, 0.0));
+            textureStore(velocity, idx, 0, vec4<f32>(newVel.x, 0.0, 0.0, 0.0));
+            textureStore(velocity, idx, 1, vec4<f32>(newVel.y, 0.0, 0.0, 0.0));
         }
 
         let hue = fract((interactions.position.x + interactions.position.y) / (dims.x + dims.y));
         let color = hsv_to_rgb(vec3f(hue, 1.0, 1.0));
         let brightness = (color.r + color.g + color.b) / 3.0;
-        textureStore(dye, idx, vec4f(brightness, 0.0, 0.0, 0.0));
+        textureStore(dye, idx, vec4<f32>(brightness, 0.0, 0.0, 0.0));
     }
 }
 

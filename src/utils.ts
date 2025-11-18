@@ -1,3 +1,5 @@
+import { Struct } from "./wgsl";
+
 function throwDetectionError(error: string): never {
   const errorElement = document.querySelector(".webgpu-not-supported") as HTMLElement;
   if (errorElement) {
@@ -36,7 +38,6 @@ export function configureCanvas(
   device: GPUDevice,
   size = { width: window.innerWidth, height: window.innerHeight }
 ): {
-  canvas: HTMLCanvasElement;
   context: GPUCanvasContext;
   format: GPUTextureFormat;
   size: { width: number; height: number };
@@ -55,7 +56,7 @@ export function configureCanvas(
     alphaMode: "premultiplied",
   });
 
-  return { canvas: canvas, context: context, format: format, size: size };
+  return { context: context, format: format, size: size };
 }
 
 export async function createShader(
@@ -99,31 +100,17 @@ function prependIncludes(code: string, includes?: Record<string, string>): strin
   return processedCode;
 }
 
-export function setupInteractions(
-  device: GPUDevice,
+export function addEventListeners(
+  interactions: Struct,
   canvas: HTMLCanvasElement | OffscreenCanvas,
   texture: { width: number; height: number },
   size: number = 20
-): {
-  interactions: {
-    data: Float32Array;
-    buffer: GPUBuffer;
-  };
-  controls: {
-    data: ArrayBuffer;
-    buffer: GPUBuffer;
-  };
-  type: GPUBufferBindingType;
-} {
-  const uniformBufferData = new Float32Array(4);
-  const controlsBufferData = new ArrayBuffer(64);
-
+) {
   let sign = 1;
-
   const position = { x: 0, y: 0 };
   const velocity = { x: 0, y: 0 };
 
-  uniformBufferData.set([position.x, position.y]);
+  interactions.position = [position.x, position.y];
   if (canvas instanceof HTMLCanvasElement) {
     canvas.addEventListener("contextmenu", (event) => {
       event.preventDefault();
@@ -153,7 +140,7 @@ export function setupInteractions(
           const x = Math.floor((position.x / rect.width) * texture.width);
           const y = Math.floor((position.y / rect.height) * texture.height);
 
-          uniformBufferData.set([x, y]);
+          interactions.position = [x, y];
         },
         { passive: true }
       );
@@ -172,7 +159,7 @@ export function setupInteractions(
           }
 
           size += velocity.y;
-          uniformBufferData.set([size], 2);
+          interactions.size = size;
         },
         { passive: true }
       );
@@ -191,7 +178,7 @@ export function setupInteractions(
             case event instanceof TouchEvent:
               sign = event.touches.length > 1 ? -1 : 1;
           }
-          uniformBufferData.set([sign * size], 2);
+          interactions.size = sign * size;
         },
         { passive: true }
       );
@@ -200,29 +187,12 @@ export function setupInteractions(
       canvas.addEventListener(
         type,
         (_event) => {
-          uniformBufferData.set([NaN], 2);
+          interactions.size = NaN;
         },
         { passive: true }
       );
     });
   }
-  const uniformBuffer = device.createBuffer({
-    label: "Interaction Buffer",
-    size: uniformBufferData.byteLength,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  });
-
-  const controlsBuffer = device.createBuffer({
-    label: "Controls Buffer",
-    size: controlsBufferData.byteLength,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  });
-
-  return {
-    interactions: { data: uniformBufferData, buffer: uniformBuffer },
-    controls: { data: controlsBufferData, buffer: controlsBuffer },
-    type: "uniform",
-  };
 }
 
 export function setupTextures(
@@ -236,11 +206,6 @@ export function setupTextures(
   },
   format?: { [key: number]: GPUTextureFormat }
 ): {
-  canvas: {
-    buffer: GPUBuffer;
-    data: Uint32Array;
-    type: GPUBufferBindingType;
-  };
   textures: { [key: number]: GPUTexture };
   bindingLayout: { [key: number]: GPUStorageTextureBindingLayout };
   size: {
@@ -300,21 +265,7 @@ export function setupTextures(
     );
   });
 
-  const canvasData = new Uint32Array([size.width, size.height, 0, 0, 0, 0]);
-  const canvasBuffer = device.createBuffer({
-    label: "Canvas Buffer",
-    size: canvasData.byteLength,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  });
-
-  device.queue.writeBuffer(canvasBuffer, /*offset=*/ 0, /*data=*/ canvasData);
-
   return {
-    canvas: {
-      buffer: canvasBuffer,
-      data: canvasData,
-      type: "uniform",
-    },
     textures: textures,
     bindingLayout: bindingLayout,
     size: size,
@@ -356,7 +307,7 @@ export function createPipelineLayout(
   });
 
   const bindGroup = device.createBindGroup({
-    label: `Bind Group`,
+    label: `bindGroup`,
     layout: bindGroupLayout,
     entries: [
       ...Object.values(BINDINGS.TEXTURE).map((binding) => ({
@@ -384,7 +335,7 @@ export function createPipelineLayout(
 
 export async function createRenderPipeline(
   device: GPUDevice,
-  canvas: { format: GPUTextureFormat },
+  format: GPUTextureFormat,
   pipelineLayout: GPUPipelineLayout,
   shader: string,
   shaderIncludes: Record<string, string>,
@@ -406,7 +357,7 @@ export async function createRenderPipeline(
     fragment: {
       module: module,
       entryPoint: entryPoints.fragment,
-      targets: [{ format: canvas.format }],
+      targets: [{ format: format }],
     },
     primitive: {
       topology: topology,
@@ -419,19 +370,20 @@ export async function createRenderPipeline(
 }
 
 export function renderPass(
-  encoder: GPUCommandEncoder,
-  canvas: { context: GPUCanvasContext },
+  device: GPUDevice,
+  context: GPUCanvasContext,
   render: { pipeline: GPURenderPipeline },
   bindGroup: GPUBindGroup,
   GROUP_INDEX: number,
   vertexCount: number = 6,
   loadOp: GPULoadOp = "load",
   storeOp: GPUStoreOp = "store"
-): GPURenderPassEncoder {
+) {
+  const encoder = device.createCommandEncoder();
   const pass = encoder.beginRenderPass({
     colorAttachments: [
       {
-        view: canvas.context.getCurrentTexture().createView(),
+        view: context.getCurrentTexture().createView(),
         loadOp: loadOp, // load existing content
         storeOp: storeOp,
       },
@@ -442,7 +394,7 @@ export function renderPass(
 
   pass.draw(vertexCount); // draw two triangles for a fullscreen quad
   pass.end();
-  return pass;
+  device.queue.submit([encoder.finish()]);
 }
 
 function channelCount(format: GPUTextureFormat): number {

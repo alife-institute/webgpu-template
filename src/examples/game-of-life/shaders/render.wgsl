@@ -1,5 +1,6 @@
 #import includes::bindings
 #import includes::textures
+#import includes::canvas
 
 /**
  * Render Shader - Displays the simulation on screen
@@ -9,8 +10,8 @@
  */
 
 struct VertexOutput {
-    @builtin(position) position: vec4f,
-    @location(0) texCoord: vec2f,
+    @builtin(position) position: vec4<f32>,
+    @location(0) texCoord: vec2<f32>,
 };
 
 // Hard-coded full-screen quad (6 vertices for 2 triangles)
@@ -21,17 +22,17 @@ fn vert(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
     // Define a full-screen quad using two triangles (6 vertices)
     // Triangle 1: (0,0), (1,0), (0,1)
     // Triangle 2: (0,1), (1,0), (1,1)
-    let vertices = array<vec2f, 6>(
-        vec2f(-1.0, -1.0),  // Bottom-left
-        vec2f( 1.0, -1.0),  // Bottom-right
-        vec2f(-1.0,  1.0),  // Top-left
-        vec2f(-1.0,  1.0),  // Top-left
-        vec2f( 1.0, -1.0),  // Bottom-right
-        vec2f( 1.0,  1.0)   // Top-right
+    let vertices = array<vec2<f32>, 6>(
+        vec2<f32>(-1.0, -1.0),  // Bottom-left
+        vec2<f32>( 1.0, -1.0),  // Bottom-right
+        vec2<f32>(-1.0,  1.0),  // Top-left
+        vec2<f32>(-1.0,  1.0),  // Top-left
+        vec2<f32>( 1.0, -1.0),  // Bottom-right
+        vec2<f32>( 1.0,  1.0)   // Top-right
     );
 
     let pos = vertices[vertexIndex];
-    output.position = vec4f(pos, 0.0, 1.0);
+    output.position = vec4<f32>(pos, 0.0, 1.0);
 
     // Convert from clip space (-1 to 1) to texture coordinates (0 to 1)
     output.texCoord = pos * 0.5 + 0.5;
@@ -48,8 +49,8 @@ fn vert(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
  * - Both layers: White (overlap)
  */
 @fragment
-fn frag(input: VertexOutput) -> @location(0) vec4f {
-    let texSize = vec2f(textureDimensions(states));
+fn frag(input: VertexOutput) -> @location(0) vec4<f32> {
+    let texSize = vec2<f32>(textureDimensions(states));
     let pixelCoord = vec2i(input.texCoord * texSize);
 
     let layer0State = textureLoad(states, pixelCoord, 0);
@@ -68,5 +69,5 @@ fn frag(input: VertexOutput) -> @location(0) vec4f {
     let hasAnyAlive = layer0Alive + layer1Alive;
     let finalColor = mix(backgroundColor, combinedColor, min(hasAnyAlive, 1.0));
 
-    return vec4f(finalColor, 1.0);
+    return vec4<f32>(finalColor, 1.0);
 }

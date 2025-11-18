@@ -1,6 +1,8 @@
 #import includes::bindings
 #import includes::textures
 #import includes::interactions
+#import includes::canvas
+#import includes::controls
 
 @compute @workgroup_size(16, 16)
 fn count_neighbors(@builtin(global_invocation_id) id: vec3<u32>) {
