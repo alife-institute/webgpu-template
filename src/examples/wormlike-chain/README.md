@@ -54,9 +54,9 @@ The simulation uses a **constraint projection method** to maintain distances bet
 
 #### Mathematical Formulation
 
-For node $i$ at position $\mathbf{p}_i$ with orientation (tangent) $\mathbf{t}_i$, connected to:
-- Tail node: position $\mathbf{p}_{i-1}$, orientation $\mathbf{t}_{i-1}$
-- Head node: position $\mathbf{p}_{i+1}$, orientation $\mathbf{t}_{i+1}$
+For node $i$ at position $\mathbf{x}_i$ with orientation (tangent) $\mathbf{t}_i$, connected to:
+- Tail node: position $\mathbf{x}_{i-1}$, orientation $\mathbf{t}_{i-1}$
+- Head node: position $\mathbf{x}_{i+1}$, orientation $\mathbf{t}_{i+1}$
 
 The **constraint** is that consecutive nodes should be separated by distance $\ell$ (controlled by `line_distance`).
 
@@ -64,11 +64,11 @@ The **constraint** is that consecutive nodes should be separated by distance $\e
 
 The displacement needed to satisfy the constraint with the tail neighbor:
 
-$$\Delta\mathbf{p}_{\text{tail}} = \mathbf{p}_{i-1} - \mathbf{p}_i + \ell \cdot \frac{\mathbf{t}_i + \mathbf{t}_{i-1}}{2}$$
+$$\Delta\mathbf{x}_{\text{tail}} = \mathbf{x}_{i-1} - \mathbf{x}_i + \ell \cdot \frac{\mathbf{t}_i + \mathbf{t}_{i-1}}{2}$$
 
 The displacement needed to satisfy the constraint with the head neighbor:
 
-$$\Delta\mathbf{p}_{\text{head}} = \mathbf{p}_{i+1} - \mathbf{p}_i - \ell \cdot \frac{\mathbf{t}_i + \mathbf{t}_{i+1}}{2}$$
+$$\Delta\mathbf{x}_{\text{head}} = \mathbf{x}_{i+1} - \mathbf{x}_i - \ell \cdot \frac{\mathbf{t}_i + \mathbf{t}_{i+1}}{2}$$
 
 **Key insight**: The offset $\pm \ell \cdot \frac{\mathbf{t}_i + \mathbf{t}_{j}}{2}$ accounts for the fact that the ideal connection point is along the average orientation of the two nodes, not just the displacement vector.
 
@@ -76,17 +76,17 @@ $$\Delta\mathbf{p}_{\text{head}} = \mathbf{p}_{i+1} - \mathbf{p}_i - \ell \cdot 
 
 The net displacement combines both constraints:
 
-$$\Delta\mathbf{p}_{\text{net}} = \Delta\mathbf{p}_{\text{head}} + \Delta\mathbf{p}_{\text{tail}}$$
+$$\Delta\mathbf{x}_{\text{net}} = \Delta\mathbf{x}_{\text{head}} + \Delta\mathbf{x}_{\text{tail}}$$
 
 The position is updated using a **damped projection** (factor of 0.5 for stability):
 
-$$\mathbf{p}_i^{\text{new}} = \mathbf{p}_i + 0.5 \cdot \Delta\mathbf{p}_{\text{net}}$$
+$$\mathbf{x}_i^{\text{new}} = \mathbf{x}_i + 0.5 \cdot \Delta\mathbf{x}_{\text{net}}$$
 
 #### Boundary Conditions
 
 - **Internal nodes**: Both displacements contribute
-- **Head endpoint**: Only $\Delta\mathbf{p}_{\text{tail}}$ contributes (no head neighbor)
-- **Tail endpoint**: Only $\Delta\mathbf{p}_{\text{head}}$ contributes (no tail neighbor)
+- **Head endpoint**: Only $\Delta\mathbf{x}_{\text{tail}}$ contributes (no head neighbor)
+- **Tail endpoint**: Only $\Delta\mathbf{x}_{\text{head}}$ contributes (no tail neighbor)
 - **Disconnected nodes**: No update (identified by `is_disconnected()`)
 
 #### Implementation
@@ -144,7 +144,7 @@ $$\mathcal{R}(\alpha) = \begin{pmatrix} \cos\alpha & -\sin\alpha \\ \sin\alpha &
 
 #### Spatial Modulation via Blur
 
-The equilibrium angle $\theta_{\text{eq}}(\mathbf{p}_i)$ is read from a **blurred parameter texture**:
+The equilibrium angle $\theta_{\text{eq}}(\mathbf{x}_i)$ is read from a **blurred parameter texture**:
 
 1. User interactions paint values into `parameters_texture` layer 0
 2. A **separable Gaussian blur** (5-pixel radius) smooths the field:
