@@ -464,12 +464,12 @@ export function arrayFromfunction(
   return array;
 }
 
-export function getRandomValues(length: number): Uint32Array {
-  const maxChunkLength = 65536 / 4;
-  const result = new Uint32Array(4 * length);
-  for (let i = 0; i < 4 * length; i += maxChunkLength) {
-    const chunkLength = Math.min(maxChunkLength, 4 * length - i);
+export function getRandomValues(length: number): number[] {
+  const maxChunkLength = 65536;
+  const result = new Uint32Array(length);
+  for (let i = 0; i < length; i += maxChunkLength) {
+    const chunkLength = Math.min(maxChunkLength, length - i);
     crypto.getRandomValues(result.subarray(i, i + chunkLength));
   }
-  return result;
+  return Array.from(result);
 }

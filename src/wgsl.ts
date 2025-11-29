@@ -254,7 +254,7 @@ export class Struct {
     }
   ) {
     this.device = device;
-    this.definition = Struct.definitionFromWGSL(code);
+    this.definition = Struct.definitionFromWGSL(code, bufferDescriptor.size);
 
     let currentOffset = 0;
     let maxAlignment = 0;
@@ -429,30 +429,62 @@ export class Struct {
    * @param wgslCode A string containing a WGSL struct definition.
    * @returns A Record mapping field names to WgslTypeDescriptor objects.
    */
-  public static definitionFromWGSL(wgslCode: string): Record<string, WgslTypeDescriptor> {
+  public static definitionFromWGSL(
+    wgslCode: string,
+    size?: number
+  ): Record<string, WgslTypeDescriptor> {
     const definition: Record<string, WgslTypeDescriptor> = {};
 
     const structMatch = wgslCode.match(/struct\s+\w+\s*\{([^}]*)\}/s);
-    if (!structMatch) {
-      throw new Error("Invalid WGSL struct definition: could not find struct block");
+    if (structMatch) {
+      const fieldsBlock = structMatch[1];
+      const fieldLines = fieldsBlock
+        .split(/[,;\n]/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+
+      for (const line of fieldLines) {
+        const fieldMatch = line.match(/^(\w+)\s*:\s*(.+)$/);
+        if (!fieldMatch) continue;
+
+        const [, fieldName, typeName] = fieldMatch;
+        const typeDescriptor = Struct.parseWGSLType(typeName.trim());
+        definition[fieldName] = typeDescriptor;
+      }
+
+      return definition;
+    } else {
+      // If no struct block found, look for storage variable definitions
+      // Pattern: var<storage, ...> variable_name : array<TYPE>;
+      // Need to handle nested angle brackets like array<vec4<u32>>
+      const storageVarMatch = wgslCode.match(
+        /var\s*<\s*storage\s*[^>]*>\s*(\w+)\s*:\s*array\s*<\s*(.+?)\s*>\s*;/
+      );
+      if (storageVarMatch) {
+        const [, varName, arrayItemType] = storageVarMatch;
+        const typeDescriptor = Struct.parseWGSLType(arrayItemType.trim());
+
+        // If it's a vector type, expand it into component fields (x, y, z, w)
+        if (typeDescriptor.componentCount > 1 && typeDescriptor.name.startsWith("vec")) {
+          const componentNames = ["x", "y", "z", "w"];
+          const scalarType = Struct.parseWGSLType(typeDescriptor.baseType);
+
+          for (let i = 0; i < typeDescriptor.componentCount; i++) {
+            // If size is provided, create array fields for each component
+            definition[componentNames[i]] =
+              size !== undefined ? array(scalarType, size) : scalarType;
+          }
+        } else {
+          definition[varName] = size !== undefined ? array(typeDescriptor, size) : typeDescriptor;
+        }
+
+        return definition;
+      }
+
+      throw new Error(
+        "Invalid WGSL struct definition: could not find struct block or storage variable definition"
+      );
     }
-
-    const fieldsBlock = structMatch[1];
-    const fieldLines = fieldsBlock
-      .split(/[,;\n]/)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
-
-    for (const line of fieldLines) {
-      const fieldMatch = line.match(/^(\w+)\s*:\s*(.+)$/);
-      if (!fieldMatch) continue;
-
-      const [, fieldName, typeName] = fieldMatch;
-      const typeDescriptor = Struct.parseWGSLType(typeName.trim());
-      definition[fieldName] = typeDescriptor;
-    }
-
-    return definition;
   }
 
   /**
