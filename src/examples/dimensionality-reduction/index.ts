@@ -145,11 +145,6 @@ async function main() {
     compute: { module: module, entryPoint: "update_positions" },
   });
 
-  const parameters = device.createComputePipeline({
-    layout: pipeline.layout,
-    compute: { module: module, entryPoint: "parameters" },
-  });
-
   const draw = device.createComputePipeline({
     layout: pipeline.layout,
     compute: { module: module, entryPoint: "draw" },
@@ -158,11 +153,6 @@ async function main() {
   const clear = device.createComputePipeline({
     layout: pipeline.layout,
     compute: { module: module, entryPoint: "clear" },
-  });
-
-  const blur = device.createComputePipeline({
-    layout: pipeline.layout,
-    compute: { module: module, entryPoint: "blur" },
   });
 
   const WORKGROUP_COUNT_BUFFER = Math.ceil(NODE_COUNT / WORKGROUP_SIZE);
@@ -187,33 +177,6 @@ async function main() {
 
   // compute pass - physics simulation
   function computePass() {
-    // Draw interactions to parameter texture
-    {
-      const encoder = device.createCommandEncoder();
-      const pass = encoder.beginComputePass();
-
-      pass.setBindGroup(pipeline.index, pipeline.bindGroup);
-      pass.setPipeline(parameters);
-      pass.dispatchWorkgroups(...WORKGROUP_COUNT_TEXTURE);
-
-      pass.end();
-      device.queue.submit([encoder.finish()]);
-    }
-
-    // Apply blur to parameter texture
-    {
-      const encoder = device.createCommandEncoder();
-      const pass = encoder.beginComputePass();
-
-      pass.setBindGroup(pipeline.index, pipeline.bindGroup);
-
-      pass.setPipeline(blur);
-      pass.dispatchWorkgroups(...WORKGROUP_COUNT_TEXTURE);
-
-      pass.end();
-      device.queue.submit([encoder.finish()]);
-    }
-
     // Clear textures
     {
       const encoder = device.createCommandEncoder();

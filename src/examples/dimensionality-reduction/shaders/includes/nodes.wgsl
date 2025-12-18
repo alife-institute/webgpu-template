@@ -1,6 +1,7 @@
 struct Node {
     id: u32,
     position: vec2<f32>,
+    orientation: vec2<f32>,
     features: vec4<f32>
 }
 
