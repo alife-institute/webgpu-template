@@ -1,2 +1,3 @@
 @group(GROUP_INDEX) @binding(BINDINGS[GROUP_INDEX].TEXTURE.RENDER) var render_texture: texture_storage_2d_array<r32float, read_write>;
 @group(GROUP_INDEX) @binding(BINDINGS[GROUP_INDEX].TEXTURE.PARAMETERS) var parameters_texture: texture_storage_2d_array<r32float, read_write>;
+@group(GROUP_INDEX) @binding(BINDINGS[GROUP_INDEX].TEXTURE.FEATURE) var feature_texture: texture_storage_2d_array<r32float, read_write>;

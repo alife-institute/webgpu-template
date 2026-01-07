@@ -33,7 +33,7 @@ const shaderIncludes: Record<string, string> = {
   interactions: interactions,
 };
 
-const NODE_COUNT = 20;
+const NODE_COUNT = 2000;
 const WORKGROUP_SIZE = 256;
 
 async function main() {
@@ -52,6 +52,7 @@ async function main() {
       depthOrArrayLayers: {
         [BINDINGS[GROUP_INDEX].TEXTURE.RENDER]: 4,
         [BINDINGS[GROUP_INDEX].TEXTURE.PARAMETERS]: 2,
+        [BINDINGS[GROUP_INDEX].TEXTURE.FEATURE]: 3,
       },
       width: size.width,
       height: size.height,
@@ -145,14 +146,14 @@ async function main() {
     compute: { module: module, entryPoint: "update_positions" },
   });
 
-  const draw = device.createComputePipeline({
+  const update_textures = device.createComputePipeline({
     layout: pipeline.layout,
-    compute: { module: module, entryPoint: "draw" },
+    compute: { module: module, entryPoint: "update_textures" },
   });
 
-  const clear = device.createComputePipeline({
+  const blur = device.createComputePipeline({
     layout: pipeline.layout,
-    compute: { module: module, entryPoint: "clear" },
+    compute: { module: module, entryPoint: "blur" },
   });
 
   const WORKGROUP_COUNT_BUFFER = Math.ceil(NODE_COUNT / WORKGROUP_SIZE);
@@ -177,13 +178,26 @@ async function main() {
 
   // compute pass - physics simulation
   function computePass() {
-    // Clear textures
+    // Update textures
     {
       const encoder = device.createCommandEncoder();
       const pass = encoder.beginComputePass();
 
       pass.setBindGroup(pipeline.index, pipeline.bindGroup);
-      pass.setPipeline(clear);
+      pass.setPipeline(update_textures);
+      pass.dispatchWorkgroups(...WORKGROUP_COUNT_TEXTURE);
+
+      pass.end();
+      device.queue.submit([encoder.finish()]);
+    }
+
+    // Blur textures
+    {
+      const encoder = device.createCommandEncoder();
+      const pass = encoder.beginComputePass();
+
+      pass.setBindGroup(pipeline.index, pipeline.bindGroup);
+      pass.setPipeline(blur);
       pass.dispatchWorkgroups(...WORKGROUP_COUNT_TEXTURE);
 
       pass.end();
@@ -197,19 +211,6 @@ async function main() {
 
       pass.setBindGroup(pipeline.index, pipeline.bindGroup);
       pass.setPipeline(update_positions);
-      pass.dispatchWorkgroups(WORKGROUP_COUNT_BUFFER);
-
-      pass.end();
-      device.queue.submit([encoder.finish()]);
-    }
-
-    // Draw nodes to render texture
-    {
-      const encoder = device.createCommandEncoder();
-      const pass = encoder.beginComputePass();
-
-      pass.setBindGroup(pipeline.index, pipeline.bindGroup);
-      pass.setPipeline(draw);
       pass.dispatchWorkgroups(WORKGROUP_COUNT_BUFFER);
 
       pass.end();

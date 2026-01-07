@@ -36,12 +36,10 @@ fn frag(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
     let x = vec2<i32>(uv * vec2<f32>(canvas.size));
     var color = vec3f(0.05, 0.05, 0.1);
 
-    let density = textureLoad(render_texture, x, 0).x;
-    let graph_color = textureLoad(render_texture, x, 1).x;
-
-    let param = textureLoad(parameters_texture, x, 0).x;
-    color = vec3f(0.2, 1.0, 0.6) * param;
-    color += vec3f(1.0, 0.2, 0.2) * density;
-    color += vec3f(0.0, 1.0, 1.0) * graph_color;
+    var feature: vec3f;
+    for (var i = 0; i < 3; i++) {
+        feature[i] = textureLoad(feature_texture, x, i).x;
+    }
+    color += feature;
     return vec4<f32>(color, 1.0);
 }
