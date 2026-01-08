@@ -246,25 +246,19 @@ async function main() {
   const gui = new GUI();
   gui.add({ reset: () => submit_initialization() }, "reset");
 
-  controls.compute_steps = 5;
+  controls.compute_steps = 100;
   gui.add(controls, "compute_steps").min(1).max(20).step(1).name("Compute Steps");
 
-  controls.sensor_angle = 0.15 * Math.PI;
-  gui.add(controls, "sensor_angle").min(0).max(Math.PI).name("Sensor Angle");
+  controls.sensor_angle = 0.12880529463291168;
+  gui.add(controls, "sensor_angle").min(0.01).max(Math.PI).name("Sensor Angle");
 
-  controls.sensor_offset = 15.0;
-  gui.add(controls, "sensor_offset").min(1).max(50).name("Sensor Offset");
+  controls.sensor_offset = 50;
+  gui.add(controls, "sensor_offset").min(2).max(50).name("Sensor Offset");
 
-  controls.steer_angle = 0.1 * Math.PI;
-  gui.add(controls, "steer_angle").min(0).max(Math.PI).name("Steer Angle");
+  controls.steer_angle = 1.2095131874084473;
+  gui.add(controls, "steer_angle").min(0.01).max(Math.PI).name("Steer Angle");
 
-  controls.line_distance = 20.0;
-  gui.add(controls, "line_distance").min(1).max(50).name("Equilibrium Line Distance");
-
-  controls.stiffness = 0.5;
-  gui.add(controls, "stiffness").min(0).max(1.0).step(0.01).name("Bending Stiffness");
-
-  controls.decay_rate = 0.99;
+  controls.decay_rate = 1.0;
   gui.add(controls, "decay_rate").min(0.9).max(1.0).step(0.001).name("Trail Decay Rate");
 
   function frame() {
