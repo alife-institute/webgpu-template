@@ -33,11 +33,14 @@ const shaderIncludes: Record<string, string> = {
   interactions: interactions,
 };
 
-const NODE_COUNT = 2000;
+const NODE_COUNT = 10000;
 const WORKGROUP_SIZE = 256;
 
 async function main() {
-  const device = await requestDevice();
+  const device = await requestDevice({}, [], {
+    maxStorageBufferBindingSize: 4294967292,
+    maxBufferSize: 4294967292,
+  });
   const { context, format, size } = configureCanvas(device);
 
   // binding indexes matching `shaders/includes/bindings.wgsl`
@@ -51,7 +54,7 @@ async function main() {
     /*size=*/ {
       depthOrArrayLayers: {
         [BINDINGS[GROUP_INDEX].TEXTURE.RENDER]: 4,
-        [BINDINGS[GROUP_INDEX].TEXTURE.PARAMETERS]: 2,
+        [BINDINGS[GROUP_INDEX].TEXTURE.PARAMETERS]: 3,
         [BINDINGS[GROUP_INDEX].TEXTURE.FEATURE]: 3,
       },
       width: size.width,
@@ -59,6 +62,8 @@ async function main() {
     },
     /*format=*/ {
       [BINDINGS[GROUP_INDEX].TEXTURE.RENDER]: "r32float",
+      [BINDINGS[GROUP_INDEX].TEXTURE.FEATURE]: "r32float",
+      [BINDINGS[GROUP_INDEX].TEXTURE.PARAMETERS]: "r32float",
     }
   );
 
@@ -141,6 +146,11 @@ async function main() {
     compute: { module: module, entryPoint: "initialize" },
   });
 
+  const clear = device.createComputePipeline({
+    layout: pipeline.layout,
+    compute: { module: module, entryPoint: "clear" },
+  });
+
   const update_positions = device.createComputePipeline({
     layout: pipeline.layout,
     compute: { module: module, entryPoint: "update_positions" },
@@ -151,9 +161,14 @@ async function main() {
     compute: { module: module, entryPoint: "update_textures" },
   });
 
-  const blur = device.createComputePipeline({
+  const blur_horizontal = device.createComputePipeline({
     layout: pipeline.layout,
-    compute: { module: module, entryPoint: "blur" },
+    compute: { module: module, entryPoint: "blur_horizontal" },
+  });
+
+  const blur_vertical = device.createComputePipeline({
+    layout: pipeline.layout,
+    compute: { module: module, entryPoint: "blur_vertical" },
   });
 
   const WORKGROUP_COUNT_BUFFER = Math.ceil(NODE_COUNT / WORKGROUP_SIZE);
@@ -167,6 +182,9 @@ async function main() {
 
     const pass = encoder.beginComputePass();
     pass.setBindGroup(pipeline.index, pipeline.bindGroup);
+
+    pass.setPipeline(clear);
+    pass.dispatchWorkgroups(...WORKGROUP_COUNT_TEXTURE);
 
     pass.setPipeline(initialize);
     pass.dispatchWorkgroups(WORKGROUP_COUNT_BUFFER);
@@ -195,11 +213,18 @@ async function main() {
     {
       const encoder = device.createCommandEncoder();
       const pass = encoder.beginComputePass();
-
       pass.setBindGroup(pipeline.index, pipeline.bindGroup);
-      pass.setPipeline(blur);
+      pass.setPipeline(blur_horizontal);
       pass.dispatchWorkgroups(...WORKGROUP_COUNT_TEXTURE);
-
+      pass.end();
+      device.queue.submit([encoder.finish()]);
+    }
+    {
+      const encoder = device.createCommandEncoder();
+      const pass = encoder.beginComputePass();
+      pass.setBindGroup(pipeline.index, pipeline.bindGroup);
+      pass.setPipeline(blur_vertical);
+      pass.dispatchWorkgroups(...WORKGROUP_COUNT_TEXTURE);
       pass.end();
       device.queue.submit([encoder.finish()]);
     }
@@ -224,14 +249,29 @@ async function main() {
   controls.compute_steps = 5;
   gui.add(controls, "compute_steps").min(1).max(20).step(1).name("Compute Steps");
 
+  controls.sensor_angle = 0.15 * Math.PI;
+  gui.add(controls, "sensor_angle").min(0).max(Math.PI).name("Sensor Angle");
+
+  controls.sensor_offset = 15.0;
+  gui.add(controls, "sensor_offset").min(1).max(50).name("Sensor Offset");
+
+  controls.steer_angle = 0.1 * Math.PI;
+  gui.add(controls, "steer_angle").min(0).max(Math.PI).name("Steer Angle");
+
   controls.line_distance = 20.0;
   gui.add(controls, "line_distance").min(1).max(50).name("Equilibrium Line Distance");
 
   controls.stiffness = 0.5;
   gui.add(controls, "stiffness").min(0).max(1.0).step(0.01).name("Bending Stiffness");
 
+  controls.decay_rate = 0.99;
+  gui.add(controls, "decay_rate").min(0.9).max(1.0).step(0.001).name("Trail Decay Rate");
+
   function frame() {
-    computePass();
+    for (let i = 0; i < controls.compute_steps; i++) {
+      canvas.key = [canvas.key[0] + 1, canvas.key[1]];
+      computePass();
+    }
     renderPass(device, context, render, pipeline.bindGroup, pipeline.index);
 
     requestAnimationFrame(frame);
