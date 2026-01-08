@@ -6,6 +6,7 @@
 #import includes::random
 
 const PI = 3.14159265358979323846;
+const FEATURE_DIMENSION: u32 = {{FEATURE_DIMENSION}}u;
 
 @compute @workgroup_size(256)
 fn initialize(@builtin(global_invocation_id) id : vec3u) {
@@ -27,12 +28,10 @@ fn initialize(@builtin(global_invocation_id) id : vec3u) {
     let angle = rand.z * 2.0 * PI;
     nodes[idx].orientation = vec2<f32>(cos(angle), sin(angle));
 
-    nodes[idx].features = vec3<f32>(
-        random_uniform(idx + 1u),
-        random_uniform(idx + 2u),
-        random_uniform(idx + 3u),
-    );
-    // nodes[idx].features[u32(idx % 3)] = 1.0;
+    for (var i = 0u; i < FEATURE_DIMENSION; i++) {
+        nodes[idx].features[i] = 0.0;
+    }
+    nodes[idx].features[idx % FEATURE_DIMENSION] = 1.0;
 }
 
 fn wrap_vec2i(v: vec2i, size: vec2i) -> vec2i {
@@ -59,9 +58,9 @@ fn update_positions(@builtin(global_invocation_id) id : vec3u) {
     let orientation = nodes[idx].orientation;
 
     // drop feature trail with toroidal wrapping
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0u; i < FEATURE_DIMENSION; i++) {
         let trail_pos = vec2i(floor(position - orientation));
-        textureStore(feature_texture, wrap_vec2i(trail_pos, size_i), i, vec4<f32>(features[i], 0, 0, 0));
+        textureStore(feature_texture, wrap_vec2i(trail_pos, size_i), i32(i), vec4<f32>(features[i], 0, 0, 0));
     }
 
     let sensor_angle = controls.sensor_angle;
@@ -76,19 +75,34 @@ fn update_positions(@builtin(global_invocation_id) id : vec3u) {
     let wrapped_left = wrap_vec2i(vec2i(floor(left_pos)), size_i);
     let wrapped_right = wrap_vec2i(vec2i(floor(right_pos)), size_i);
 
-    var sense_center: vec3f;
-    var sense_left: vec3f;
-    var sense_right: vec3f;
+    var dot_center = 0.0;
+    var dot_left = 0.0;
+    var dot_right = 0.0;
+    var norm_center_sq = 0.0;
+    var norm_left_sq = 0.0;
+    var norm_right_sq = 0.0;
+    var norm_feature_sq = 0.0;
 
-    for (var i = 0; i < 3; i++) {
-        sense_center[i] = textureLoad(feature_texture, wrapped_center, i).x;
-        sense_left[i] = textureLoad(feature_texture, wrapped_left, i).x;
-        sense_right[i] = textureLoad(feature_texture, wrapped_right, i).x;
+    for (var i = 0u; i < FEATURE_DIMENSION; i++) {
+        let f = features[i];
+        norm_feature_sq += f * f;
+
+        let s_center = textureLoad(feature_texture, wrapped_center, i32(i)).x;
+        dot_center += s_center * f;
+        norm_center_sq += s_center * s_center;
+
+        let s_left = textureLoad(feature_texture, wrapped_left, i32(i)).x;
+        dot_left += s_left * f;
+        norm_left_sq += s_left * s_left;
+
+        let s_right = textureLoad(feature_texture, wrapped_right, i32(i)).x;
+        dot_right += s_right * f;
+        norm_right_sq += s_right * s_right;
     }
 
-    let pull_center = dot(normalize(sense_center), normalize(features));
-    let pull_left = dot(normalize(sense_left), normalize(features));
-    let pull_right = dot(normalize(sense_right), normalize(features));
+    let pull_center = dot_center / (sqrt(norm_center_sq) * sqrt(norm_feature_sq) + 1e-6);
+    let pull_left = dot_left / (sqrt(norm_left_sq) * sqrt(norm_feature_sq) + 1e-6);
+    let pull_right = dot_right / (sqrt(norm_right_sq) * sqrt(norm_feature_sq) + 1e-6);
 
     var turn_dir = 0.0;
     if (pull_center > pull_left && pull_center > pull_right) {
@@ -130,9 +144,9 @@ fn clear(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
 
-    for (var i = 0; i < 3; i++) {
-        textureStore(feature_texture, idx, i, vec4f(0.0));
-        textureStore(parameters_texture, idx, i, vec4f(0.0));
+    for (var i = 0u; i < FEATURE_DIMENSION; i++) {
+        textureStore(feature_texture, idx, i32(i), vec4f(0.0));
+        textureStore(parameters_texture, idx, i32(i), vec4f(0.0));
     }
 }
 
@@ -144,8 +158,8 @@ fn update_textures(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
     
-    for (var i = 0; i < 3; i++) {
-        textureStore(feature_texture, idx, i, controls.decay_rate * textureLoad(feature_texture, idx, i) );
+    for (var i = 0u; i < FEATURE_DIMENSION; i++) {
+        textureStore(feature_texture, idx, i32(i), controls.decay_rate * textureLoad(feature_texture, idx, i32(i)) );
     }
 }
 
@@ -159,17 +173,17 @@ fn blur_horizontal(@builtin(global_invocation_id) id: vec3<u32>) {
     let radius = 1;
     let size = vec2i(canvas.size);
 
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0u; i < FEATURE_DIMENSION; i++) {
         var sum = vec4<f32>(0.0);
         var weight_sum = 0.0;
 
         for (var dx = -radius; dx <= radius; dx++) {
             let sample_idx = vec2i((idx.x + dx + size.x) % size.x, idx.y);
-            sum += textureLoad(feature_texture, sample_idx, i);
+            sum += textureLoad(feature_texture, sample_idx, i32(i));
             weight_sum += 1.0;
         }
 
-        // textureStore(parameters_texture, idx, i, sum / weight_sum);
+        textureStore(parameters_texture, idx, i32(i), sum / weight_sum);
     }
 }
 
@@ -183,16 +197,16 @@ fn blur_vertical(@builtin(global_invocation_id) id: vec3<u32>) {
     let radius = 1;
     let size = vec2i(canvas.size);
 
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0u; i < FEATURE_DIMENSION; i++) {
         var sum = vec4<f32>(0.0);
         var weight_sum = 0.0;
 
         for (var dy = -radius; dy <= radius; dy++) {
             let sample_idx = vec2i(idx.x, (idx.y + dy + size.y) % size.y);
-            sum += textureLoad(parameters_texture, sample_idx, i);
+            sum += textureLoad(parameters_texture, sample_idx, i32(i));
             weight_sum += 1.0;
         }
 
-        // textureStore(feature_texture, idx, i, sum / weight_sum);
+        textureStore(feature_texture, idx, i32(i), sum / weight_sum);
     }
 }

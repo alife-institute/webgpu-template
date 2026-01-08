@@ -35,6 +35,10 @@ const shaderIncludes: Record<string, string> = {
 
 const NODE_COUNT = 10000;
 const WORKGROUP_SIZE = 256;
+const FEATURE_DIMENSION = 8;
+
+// Inject constants into shader includes
+shaderIncludes.nodes = shaderIncludes.nodes.replaceAll("{{FEATURE_DIMENSION}}", FEATURE_DIMENSION.toString());
 
 async function main() {
   const device = await requestDevice({}, [], {
@@ -54,8 +58,8 @@ async function main() {
     /*size=*/ {
       depthOrArrayLayers: {
         [BINDINGS[GROUP_INDEX].TEXTURE.RENDER]: 4,
-        [BINDINGS[GROUP_INDEX].TEXTURE.PARAMETERS]: 3,
-        [BINDINGS[GROUP_INDEX].TEXTURE.FEATURE]: 3,
+        [BINDINGS[GROUP_INDEX].TEXTURE.PARAMETERS]: FEATURE_DIMENSION,
+        [BINDINGS[GROUP_INDEX].TEXTURE.FEATURE]: FEATURE_DIMENSION,
       },
       width: size.width,
       height: size.height,
@@ -129,17 +133,20 @@ async function main() {
   // overall memory layout
   const pipeline = createPipelineLayout(device, BINDINGS[GROUP_INDEX], textures, buffers);
 
+  const processedComputeShader = computeShader.replaceAll("{{FEATURE_DIMENSION}}", FEATURE_DIMENSION.toString());
+  const processedRenderShader = renderShader.replaceAll("{{FEATURE_DIMENSION}}", FEATURE_DIMENSION.toString());
+
   // traditional render pipeline of vert -> frag
   const render = await createRenderPipeline(
     device,
     format,
     pipeline.layout,
-    renderShader,
+    processedRenderShader,
     shaderIncludes
   );
 
   // Create compute pipelines
-  const module = await createShader(device, computeShader, shaderIncludes);
+  const module = await createShader(device, processedComputeShader, shaderIncludes);
 
   const initialize = device.createComputePipeline({
     layout: pipeline.layout,

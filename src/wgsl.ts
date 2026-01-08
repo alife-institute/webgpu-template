@@ -438,10 +438,24 @@ export class Struct {
     const structMatch = wgslCode.match(/struct\s+\w+\s*\{([^}]*)\}/s);
     if (structMatch) {
       const fieldsBlock = structMatch[1];
-      const fieldLines = fieldsBlock
-        .split(/[,;\n]/)
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0);
+      // Split by semicolons or newlines, avoiding splitting inside angle brackets
+      const fieldLines: string[] = [];
+      let currentLine = "";
+      let bracketDepth = 0;
+      
+      for (let i = 0; i < fieldsBlock.length; i++) {
+        const char = fieldsBlock[i];
+        if (char === "<") bracketDepth++;
+        if (char === ">") bracketDepth--;
+        
+        if ((char === ";" || char === "," || char === "\n") && bracketDepth === 0) {
+          if (currentLine.trim()) fieldLines.push(currentLine.trim());
+          currentLine = "";
+        } else {
+          currentLine += char;
+        }
+      }
+      if (currentLine.trim()) fieldLines.push(currentLine.trim());
 
       for (const line of fieldLines) {
         const fieldMatch = line.match(/^(\w+)\s*:\s*(.+)$/);
