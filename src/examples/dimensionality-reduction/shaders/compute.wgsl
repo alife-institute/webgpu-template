@@ -30,7 +30,7 @@ fn initialize(@builtin(global_invocation_id) id : vec3u) {
     nodes[idx].features = vec3<f32>(
         random_uniform(idx + 1u),
         random_uniform(idx + 2u),
-        0.0
+        random_uniform(idx + 3u),
     );
     // nodes[idx].features[u32(idx % 3)] = 1.0;
 }
