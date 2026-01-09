@@ -29,9 +29,8 @@ fn initialize(@builtin(global_invocation_id) id : vec3u) {
     nodes[idx].orientation = vec2<f32>(cos(angle), sin(angle));
 
     for (var i = 0u; i < FEATURE_DIMENSION; i++) {
-        nodes[idx].features[i] = 0.0;
+        nodes[idx].features[i] = random_uniform(idx + i);
     }
-    nodes[idx].features[idx % FEATURE_DIMENSION] = 1.0;
 }
 
 fn wrap_vec2i(v: vec2i, size: vec2i) -> vec2i {
@@ -183,7 +182,7 @@ fn blur_horizontal(@builtin(global_invocation_id) id: vec3<u32>) {
             weight_sum += 1.0;
         }
 
-        textureStore(parameters_texture, idx, i32(i), sum / weight_sum);
+        // textureStore(parameters_texture, idx, i32(i), sum / weight_sum);
     }
 }
 
@@ -207,6 +206,6 @@ fn blur_vertical(@builtin(global_invocation_id) id: vec3<u32>) {
             weight_sum += 1.0;
         }
 
-        textureStore(feature_texture, idx, i32(i), sum / weight_sum);
+        // textureStore(feature_texture, idx, i32(i), sum / weight_sum);
     }
 }

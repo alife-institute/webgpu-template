@@ -35,10 +35,13 @@ const shaderIncludes: Record<string, string> = {
 
 const NODE_COUNT = 10000;
 const WORKGROUP_SIZE = 256;
-const FEATURE_DIMENSION = 8;
+const FEATURE_DIMENSION = 5;
 
 // Inject constants into shader includes
-shaderIncludes.nodes = shaderIncludes.nodes.replaceAll("{{FEATURE_DIMENSION}}", FEATURE_DIMENSION.toString());
+shaderIncludes.nodes = shaderIncludes.nodes.replaceAll(
+  "{{FEATURE_DIMENSION}}",
+  FEATURE_DIMENSION.toString()
+);
 
 async function main() {
   const device = await requestDevice({}, [], {
@@ -133,8 +136,14 @@ async function main() {
   // overall memory layout
   const pipeline = createPipelineLayout(device, BINDINGS[GROUP_INDEX], textures, buffers);
 
-  const processedComputeShader = computeShader.replaceAll("{{FEATURE_DIMENSION}}", FEATURE_DIMENSION.toString());
-  const processedRenderShader = renderShader.replaceAll("{{FEATURE_DIMENSION}}", FEATURE_DIMENSION.toString());
+  const processedComputeShader = computeShader.replaceAll(
+    "{{FEATURE_DIMENSION}}",
+    FEATURE_DIMENSION.toString()
+  );
+  const processedRenderShader = renderShader.replaceAll(
+    "{{FEATURE_DIMENSION}}",
+    FEATURE_DIMENSION.toString()
+  );
 
   // traditional render pipeline of vert -> frag
   const render = await createRenderPipeline(
@@ -254,15 +263,15 @@ async function main() {
   gui.add({ reset: () => submit_initialization() }, "reset");
 
   controls.compute_steps = 200;
-  gui.add(controls, "compute_steps").min(1).max(20).step(1).name("Compute Steps");
+  gui.add(controls, "compute_steps").min(1).max(200).step(1).name("Compute Steps");
 
-  controls.sensor_angle = 0.21668511629104614;
+  controls.sensor_angle = 2.371220827102661;
   gui.add(controls, "sensor_angle").min(0.01).max(Math.PI).name("Sensor Angle");
 
   controls.sensor_offset = 50;
   gui.add(controls, "sensor_offset").min(2).max(50).name("Sensor Offset");
 
-  controls.steer_angle = 1.3315321207046509;
+  controls.steer_angle = 1.0246360301971436;
   gui.add(controls, "steer_angle").min(0.01).max(Math.PI).name("Steer Angle");
 
   controls.decay_rate = 0.999;
